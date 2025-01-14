@@ -1,0 +1,45 @@
+{
+	"schemaVersion": 1,
+	"id": "block-counter",
+	"version": "${version}",
+	"name": "Block Counter",
+	"description": "Counts the number of blocks in a line",
+	"authors": [
+		"azulaFYRE"
+	],
+	"contributors": [
+		{
+			"name": "0x3C50",
+			"contact": {
+				"homepage": "https://modrinth.com/user/0x3C50"
+			}
+		}
+	],
+	"license": "CC-BY 4.0",
+	"icon": "assets/block-counter/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"azula.blockcounter.BlockCounter"
+		],
+		"client": [
+			"azula.blockcounter.BlockCounterClient"
+		],
+		"modmenu": [
+			"azula.blockcounter.config.BlockCounterModMenuApiImpl"
+		]
+	},
+	"mixins": [
+		"block-counter.mixins.json",
+		{
+			"config": "block-counter.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.16.9",
+		"minecraft": ">=1.21.4",
+		"java": ">=21",
+		"fabric-api": "*"
+	}
+}

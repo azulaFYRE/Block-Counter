@@ -142,7 +142,7 @@ public class BlockCounterClient implements ClientModInitializer {
         } else {
 
             player.sendMessage(
-                    Text.literal("Block count aborted.\n")
+                    Text.literal("Block count aborted.")
                             .formatted(Random.chatColorToFormat(config.chatColor)),
                     false
             );
