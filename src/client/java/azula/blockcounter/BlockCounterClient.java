@@ -1,16 +1,23 @@
 package azula.blockcounter;
 
 import azula.blockcounter.config.BlockCounterModMenuConfig;
+import azula.blockcounter.event.LockCursorCallback;
 import azula.blockcounter.rendering.BlockRenderingService;
+import azula.blockcounter.rendering.ImGuiService;
 import azula.blockcounter.util.BlockCalculations;
 import azula.blockcounter.util.Random;
+import imgui.ImGui;
+import imgui.flag.ImGuiCond;
+import imgui.type.ImBoolean;
 import me.shedaniel.autoconfig.AutoConfig;
 import me.shedaniel.autoconfig.ConfigHolder;
 import me.shedaniel.autoconfig.serializer.Toml4jConfigSerializer;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
+import net.fabricmc.fabric.api.event.client.player.ClientPreAttackCallback;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.entity.player.PlayerEntity;
@@ -22,6 +29,7 @@ import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class BlockCounterClient implements ClientModInitializer {
@@ -31,6 +39,7 @@ public class BlockCounterClient implements ClientModInitializer {
     private final BlockRenderingService blockRenderingService = new BlockRenderingService();
 
     public static KeyBinding activationKey;
+    public static KeyBinding configMenuKey;
 
     private final AtomicReference<ActivationStep> standStep = new AtomicReference<>();
     private final AtomicReference<ActivationStep> clickStep = new AtomicReference<>();
@@ -39,6 +48,8 @@ public class BlockCounterClient implements ClientModInitializer {
 
     private Vec3d firstPosition;
     private Vec3d secondPosition;
+
+    private ImBoolean menuOpen = new ImBoolean(false);
 
     @Override
     public void onInitializeClient() {
@@ -58,27 +69,64 @@ public class BlockCounterClient implements ClientModInitializer {
                 "text.category.blockcounter"
         ));
 
+        // Grab config menu keyBinding
+        configMenuKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "text.autoconfig.blockcounter.option.configMenuKey",
+                GLFW.GLFW_KEY_DELETE,
+                "text.category.blockcounter"
+        ));
+
         // Handle activation key press
         standStep.set(ActivationStep.FINISHED);
         clickStep.set(ActivationStep.FINISHED);
 
+        // Stop all player movement when menu open
+        ClientTickEvents.START_CLIENT_TICK.register(client -> {
+            if (menuOpen.get()) Random.lockMovement();
+        });
+
+        // Stop mouse click when menu is open
+        ClientPreAttackCallback.EVENT.register((client, player, tick) -> menuOpen.get());
+
+        // Keep the mouse unlocked when left-clicking while the menu is open
+        LockCursorCallback.EVENT.register(() -> menuOpen.get() ? ActionResult.FAIL : ActionResult.PASS);
+
         // Handle Standing Activation Method
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
+
+            while (configMenuKey.wasPressed()) {
+                menuOpen.set(!menuOpen.get());
+
+                if (menuOpen.get()) {
+                    client.mouse.unlockCursor();
+                } else {
+                    client.mouse.lockCursor();
+                }
+            }
+
             while (activationKey.wasPressed()) {
                 assert client.player != null;
 
-                if (config.activationMethod.equals(ActivationMethod.STANDING)) {
-                    handleStanding(client.player);
-                } else {
-                    handleClickActivation(client.player);
+                menuOpen.set(false);
+
+                if (ImGuiService.selectedShape.equals(Shape.LINE)) {
+                    if (config.activationMethod.equals(ActivationMethod.STANDING)) {
+                        handleStanding(client.player);
+                    } else {
+                        handleClickActivation(client.player);
+                    }
                 }
             }
         });
 
         // Handle Click Activation Method
         UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
-            if (config.activationMethod.equals(ActivationMethod.CLICK)) {
-                return handleClick(player, hitResult.getBlockPos());
+            if (ImGuiService.selectedShape.equals(Shape.LINE)) {
+                if (config.activationMethod.equals(ActivationMethod.CLICK)) {
+                    return handleClick(player, hitResult.getBlockPos());
+                } else {
+                    return ActionResult.PASS;
+                }
             } else {
                 return ActionResult.PASS;
             }
@@ -86,20 +134,44 @@ public class BlockCounterClient implements ClientModInitializer {
 
         // Block rendering
         WorldRenderEvents.LAST.register(context -> {
-            if (firstPosition != null) {
-                if (config.activationMethod.equals(ActivationMethod.STANDING)) {
-                    blockRenderingService.renderStandingSelection(
-                            context.matrixStack(),
-                            firstPosition,
-                            config);
-                } else {
-                    blockRenderingService.renderClickSelection(
-                            context.matrixStack(),
-                            firstPosition,
-                            config);
+
+            // Line rendering (block counting)
+            if (ImGuiService.selectedShape.equals(Shape.LINE)) {
+                if (firstPosition != null) {
+                    if (config.activationMethod.equals(ActivationMethod.STANDING)) {
+                        blockRenderingService.renderStandingSelection(
+                                context.matrixStack(),
+                                firstPosition,
+                                config);
+                    } else {
+                        blockRenderingService.renderClickSelection(
+                                context.matrixStack(),
+                                firstPosition,
+                                config);
+                    }
                 }
             }
+
+
         });
+
+        // ImGui Menu
+        HudRenderCallback.EVENT.register((context, tick) -> {
+            if (menuOpen.get()) {
+                ImGuiService.draw(io -> {
+
+                    ImGui.setNextWindowPos(0, 0, ImGuiCond.Once);
+
+                    try {
+                        ImGuiService.renderMenu();
+                    } catch (IOException e) {
+                        throw new RuntimeException("Block-Counter ImGui menu operation failed: \n" + e.getMessage());
+                    }
+
+                });
+            }
+        });
+
     }
 
     private void handleStanding(PlayerEntity player) {

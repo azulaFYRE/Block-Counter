@@ -4,6 +4,7 @@
   "text.autoconfig.blockcounter.category.Customization": "Customization",
   "text.autoconfig.blockcounter.option.activationMethod": "Activation Method",
   "text.autoconfig.blockcounter.option.activationKey": "Activation Key",
+  "text.autoconfig.blockcounter.option.configMenuKey": "Open Config Menu",
   "text.autoconfig.blockcounter.option.showPosMessages": "Position Messages",
   "text.autoconfig.blockcounter.option.simplifiedMessages": "Simplified Messages",
   "text.autoconfig.blockcounter.option.chatColor": "Chat Message Color",

@@ -3,7 +3,8 @@
 	"package": "azula.blockcounter.mixin.client",
 	"compatibilityLevel": "JAVA_21",
 	"client": [
-		"ExampleClientMixin"
+		"ClientMixin",
+		"MouseMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

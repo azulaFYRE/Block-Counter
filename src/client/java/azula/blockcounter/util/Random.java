@@ -1,6 +1,7 @@
 package azula.blockcounter.util;
 
 import azula.blockcounter.config.ChatColor;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.math.Vec3d;
 
@@ -32,6 +33,20 @@ public class Random {
             case YELLOW -> Formatting.YELLOW;
             case WHITE -> Formatting.WHITE;
         };
+
+    }
+
+    // This is a terrible way of doing this I'm pretty sure
+    public static void lockMovement() {
+        MinecraftClient client = MinecraftClient.getInstance();
+
+        client.options.forwardKey.setPressed(false);
+        client.options.backKey.setPressed(false);
+        client.options.leftKey.setPressed(false);
+        client.options.rightKey.setPressed(false);
+        client.options.jumpKey.setPressed(false);
+        client.options.sprintKey.setPressed(false);
+        client.options.sneakKey.setPressed(false);
 
     }
 }
