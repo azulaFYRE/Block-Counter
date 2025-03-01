@@ -16,9 +16,11 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 import net.fabricmc.fabric.api.event.client.player.ClientPreAttackCallback;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.text.Text;
@@ -43,6 +45,7 @@ public class BlockCounterClient implements ClientModInitializer {
 
     private final AtomicReference<ActivationStep> standStep = new AtomicReference<>();
     private final AtomicReference<ActivationStep> clickStep = new AtomicReference<>();
+    private final AtomicReference<ActivationStep> shapeStep = new AtomicReference<>();
 
     private BlockCounterModMenuConfig config;
 
@@ -79,6 +82,7 @@ public class BlockCounterClient implements ClientModInitializer {
         // Handle activation key press
         standStep.set(ActivationStep.FINISHED);
         clickStep.set(ActivationStep.FINISHED);
+        shapeStep.set(ActivationStep.FINISHED);
 
         // Stop all player movement when menu open
         ClientTickEvents.START_CLIENT_TICK.register(client -> {
@@ -94,6 +98,7 @@ public class BlockCounterClient implements ClientModInitializer {
         // Handle Standing Activation Method
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
 
+            // Check for menu key
             while (configMenuKey.wasPressed()) {
                 menuOpen.set(!menuOpen.get());
 
@@ -104,24 +109,26 @@ public class BlockCounterClient implements ClientModInitializer {
                 }
             }
 
+            // Check for activation key
             while (activationKey.wasPressed()) {
                 assert client.player != null;
 
                 menuOpen.set(false);
 
-                if (ImGuiService.selectedShape.equals(Shape.LINE)) {
-                    if (config.activationMethod.equals(ActivationMethod.STANDING)) {
-                        handleStanding(client.player);
-                    } else {
-                        handleClickActivation(client.player);
-                    }
-                }
+                Shape selected = Shape.parseInt(ImGuiService.selectedShape.get());
+                if (selected == null) return;
+
+                handleShapeSelection(selected, client);
             }
         });
 
         // Handle Click Activation Method
         UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
-            if (ImGuiService.selectedShape.equals(Shape.LINE)) {
+
+            Shape selected = Shape.parseInt(ImGuiService.selectedShape.get());
+            if (selected == null) return ActionResult.PASS;
+
+            if (selected.equals(Shape.LINE)) {
                 if (config.activationMethod.equals(ActivationMethod.CLICK)) {
                     return handleClick(player, hitResult.getBlockPos());
                 } else {
@@ -135,24 +142,10 @@ public class BlockCounterClient implements ClientModInitializer {
         // Block rendering
         WorldRenderEvents.LAST.register(context -> {
 
-            // Line rendering (block counting)
-            if (ImGuiService.selectedShape.equals(Shape.LINE)) {
-                if (firstPosition != null) {
-                    if (config.activationMethod.equals(ActivationMethod.STANDING)) {
-                        blockRenderingService.renderStandingSelection(
-                                context.matrixStack(),
-                                firstPosition,
-                                config);
-                    } else {
-                        blockRenderingService.renderClickSelection(
-                                context.matrixStack(),
-                                firstPosition,
-                                config);
-                    }
-                }
-            }
+            Shape selected = Shape.parseInt(ImGuiService.selectedShape.get());
+            if (selected == null) return;
 
-
+            handleRender(selected, context);
         });
 
         // ImGui Menu
@@ -172,6 +165,18 @@ public class BlockCounterClient implements ClientModInitializer {
             }
         });
 
+    }
+
+    private void handleShapeSelection(Shape selected, MinecraftClient client) {
+        if (selected.equals(Shape.LINE)) {
+            if (config.activationMethod.equals(ActivationMethod.STANDING)) {
+                handleStanding(client.player);
+            } else {
+                handleClickActivation(client.player);
+            }
+        } else if (selected.equals(Shape.QUAD)) {
+            handleQuad(client.player);
+        }
     }
 
     private void handleStanding(PlayerEntity player) {
@@ -251,6 +256,59 @@ public class BlockCounterClient implements ClientModInitializer {
 
         } else {
             return ActionResult.PASS;
+        }
+    }
+
+    private void handleQuad(PlayerEntity player) {
+
+        if (shapeStep.get().equals(ActivationStep.STARTED)) {
+            shapeStep.set(ActivationStep.DURING);
+
+            if (config.activationMethod.equals(ActivationMethod.STANDING)) {
+                firstPosition = player.getPos().subtract(new Vec3d(0, 1, 0));
+            } else {
+                firstPosition = blockRenderingService.getCrosshairBlockPos();
+            }
+
+        } else if (shapeStep.get().equals(ActivationStep.DURING)) {
+            shapeStep.set(ActivationStep.FINISHED);
+            firstPosition = null;
+        } else {
+            shapeStep.set(ActivationStep.STARTED);
+            player.sendMessage(Text.literal("Activate again to place then destroy...")
+                            .formatted(Random.chatColorToFormat(config.chatColor)),
+                    false);
+        }
+    }
+
+    private void handleRender(Shape selected, WorldRenderContext context) {
+        switch (selected) {
+            case Shape.LINE:
+                if (firstPosition != null) {
+                    if (config.activationMethod.equals(ActivationMethod.STANDING)) {
+                        blockRenderingService.renderStandingSelection(
+                                context.matrixStack(),
+                                firstPosition,
+                                config);
+                    } else {
+                        blockRenderingService.renderClickSelection(
+                                context.matrixStack(),
+                                firstPosition,
+                                config);
+                    }
+                }
+                break;
+            case Shape.CIRCLE:
+                break;
+            case Shape.QUAD:
+
+                if (shapeStep.get().equals(ActivationStep.STARTED)) {
+                    blockRenderingService.renderQuad(context.matrixStack(), null, config);
+                } else if (shapeStep.get().equals(ActivationStep.DURING)) {
+                    blockRenderingService.renderQuad(context.matrixStack(), BlockPos.ofFloored(firstPosition), config);
+                }
+
+                break;
         }
     }
 

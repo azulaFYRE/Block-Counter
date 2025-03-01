@@ -1,5 +1,6 @@
 package azula.blockcounter.rendering;
 
+import azula.blockcounter.ActivationMethod;
 import azula.blockcounter.config.BlockCounterModMenuConfig;
 import azula.blockcounter.config.RenderType;
 import azula.blockcounter.util.BlockCalculations;
@@ -11,6 +12,7 @@ import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.math.Vec3i;
 import net.minecraft.world.RaycastContext;
 
 import java.awt.Color;
@@ -50,7 +52,7 @@ public class BlockRenderingService {
             Vec3d fixedFirst = new Vec3d(blockPosFirst.getX(), blockPosFirst.getY(), blockPosFirst.getZ());
             Vec3d toRender = new Vec3d(blockPosPlayer.getX(), blockPosPlayer.getY() - 1, blockPosPlayer.getZ());
 
-            this.render(config, stack, fixedFirst, toRender, false);
+            this.renderLine(config, stack, fixedFirst, toRender, false);
         }
     }
 
@@ -60,13 +62,55 @@ public class BlockRenderingService {
             Vec3d crosshairBlock = this.getCrosshairBlockPos();
 
             if (crosshairBlock != null) {
-                this.render(config, stack, firstPos, crosshairBlock, true);
+                this.renderLine(config, stack, firstPos, crosshairBlock, true);
             }
         }
 
     }
 
-    private Vec3d getCrosshairBlockPos() {
+    public void renderQuad(MatrixStack stack, BlockPos lockPos, BlockCounterModMenuConfig config) {
+
+        Vec3d offset = new Vec3d(ImGuiService.xOffset[0], ImGuiService.yOffset[0], ImGuiService.zOffset[0]);
+
+        BlockPos renderBlockPos;
+        if (lockPos == null) {
+            // First pos is either from where player is standing or where they are looking
+            if (config.activationMethod.equals(ActivationMethod.STANDING)) {
+                renderBlockPos = BlockPos.ofFloored(
+                        MinecraftClient.getInstance().player.getPos()
+                                .subtract(new Vec3d(0, 1, 0)));
+            } else {
+                Vec3d crosshairPos = getCrosshairBlockPos();
+                if (crosshairPos == null) return;
+                renderBlockPos = BlockPos.ofFloored(crosshairPos);
+
+            }
+        } else {
+            renderBlockPos = lockPos;
+        }
+
+
+        int length = ImGuiService.length[0];
+        int width = ImGuiService.width[0];
+        int height = ImGuiService.height[0];
+
+        Vec3d dimensions = new Vec3d(length, height, width);
+
+        this.setRenderColors(config);
+
+        Vec3d renderPos = new Vec3d(renderBlockPos.getX(), renderBlockPos.getY(), renderBlockPos.getZ());
+        renderPos = renderPos.add(offset);
+
+        if (this.renderType.equals(RenderType.SOLID)) {
+            Renderer3d.renderFilled(stack, this.renderColor, renderPos, dimensions);
+        } else if (this.renderType.equals(RenderType.EDGE_ONLY)) {
+            Renderer3d.renderOutline(stack, this.edgeColor, renderPos, dimensions);
+        } else {
+            Renderer3d.renderEdged(stack, this.renderColor, this.edgeColor, renderPos, dimensions);
+        }
+    }
+
+    public Vec3d getCrosshairBlockPos() {
 
         MinecraftClient client = MinecraftClient.getInstance();
         ClientPlayerEntity player = MinecraftClient.getInstance().player;
@@ -104,7 +148,7 @@ public class BlockRenderingService {
         return new Vec3d((int) vec.x, (int) vec.y, (int) vec.z);
     }
 
-    private void render(BlockCounterModMenuConfig config, MatrixStack stack, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
+    private void renderLine(BlockCounterModMenuConfig config, MatrixStack stack, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
 
         this.setRenderColors(config);
 

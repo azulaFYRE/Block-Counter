@@ -32,16 +32,23 @@ public class ImGuiService {
     public final static int[] length = {1};
     public final static int[] width = {1};
     public final static int[] height = {1};
-    public static ImBoolean filled = new ImBoolean(false);
 
     // Circle
     public final static int[] radius = {1};
     public final static int[] circleHeight = {1};
-    public static ImBoolean circleFilled = new ImBoolean(false);
+
+    // Offset
+    public final static int[] xOffset = {0};
+    public final static int[] yOffset = {0};
+    public final static int[] zOffset = {0};
 
     // Slider Values
     private final static int MIN = 1;
     private final static int MAX = 100;
+    private final static int OFFSET_MIN = -100;
+    private final static int OFFSET_MAX = 100;
+
+    private static int totalBlocks = 1;
 
     private static float[] textColor;
     private static float[] accentColor;
@@ -175,10 +182,14 @@ public class ImGuiService {
                 // Shapes
                 if (ImGui.beginTabItem("Shapes")) {
                     ImGui.text("Shape");
-                    ImGui.combo(" ", selectedShape, shapeOptions); // empty string makes dropdown break :/
+
+                    // empty string makes dropdown break :/
+                    ImGui.combo(" ", selectedShape, shapeOptions);
+
+                    Shape selected = Shape.parseInt(selectedShape.get());
 
                     // Line Config
-                    if(selectedShape.intValue() == Shape.LINE.ordinal()) {
+                    if(selected.equals(Shape.LINE)) {
                         ImGui.checkbox("Axis-aligned", axisAligned);
 
                         if (axisAligned.get()) {
@@ -187,18 +198,36 @@ public class ImGuiService {
                     }
 
                     // Quad Config
-                    if (selectedShape.intValue() == Shape.QUAD.ordinal()) {
+                    if (selected.equals(Shape.QUAD)) {
                         ImGui.sliderInt("Length", length, MIN, MAX, ImGuiSliderFlags.AlwaysClamp);
                         ImGui.sliderInt("Width", width, MIN, MAX, ImGuiSliderFlags.AlwaysClamp);
                         ImGui.sliderInt("Height", height, MIN, MAX, ImGuiSliderFlags.AlwaysClamp);
-                        ImGui.checkbox("Filled", filled);
                     }
 
                     // Circle Config
-                    if (selectedShape.intValue() == Shape.CIRCLE.ordinal()) {
+                    if (selected.equals(Shape.CIRCLE)) {
                         ImGui.sliderInt("Radius", radius, MIN, MAX, ImGuiSliderFlags.AlwaysClamp);
                         ImGui.sliderInt("Height", circleHeight, MIN, MAX, ImGuiSliderFlags.AlwaysClamp);
-                        ImGui.checkbox("Filled", circleFilled);
+                    }
+
+                    // Offset
+                    if (!selected.equals(Shape.LINE)) {
+                        ImGui.separator();
+                        ImGui.text("Offset");
+                        ImGui.sliderInt("X", xOffset, OFFSET_MIN, OFFSET_MAX, ImGuiSliderFlags.AlwaysClamp);
+                        ImGui.sliderInt("Y", yOffset, OFFSET_MIN, OFFSET_MAX, ImGuiSliderFlags.AlwaysClamp);
+                        ImGui.sliderInt("Z", zOffset, OFFSET_MIN, OFFSET_MAX, ImGuiSliderFlags.AlwaysClamp);
+
+                        ImGui.separator();
+
+                        totalBlocks = switch (selected) {
+                            case LINE -> 1;
+                            case QUAD -> length[0] * width[0] * height[0];
+                            case CIRCLE -> 1;
+                            default -> 1;
+                        };
+
+                        ImGui.text("Total Blocks: " + totalBlocks);
                     }
 
                     ImGui.endTabItem();
@@ -207,7 +236,6 @@ public class ImGuiService {
                 // Menu Settings
                 if (ImGui.beginTabItem("Menu Config")) {
 
-                    // TODO: ADD A RESET BUTTON TO SWITCH BACK TO LAST LOADED COLOR
                     ImGui.text("Accent Color");
                     ImGui.colorEdit4("Accent Color", accentColor, ImGuiColorEditFlags.NoLabel);
 
@@ -228,16 +256,24 @@ public class ImGuiService {
                     ImGui.separator();
                     boolean shouldSave = ImGui.button("Save");
 
+                    // Save config to disk and display popup
                     if (shouldSave) {
                         config.setAccentColor(accentColor);
                         config.setTextColor(textColor);
                         config.setBackgroundColor(backgroundColor);
 
                         ImGuiConfigService.saveConfigToDisk(config);
+
+                        ImGui.openPopup("Saved");
+                    }
+
+                    // Save confirmation
+                    if (ImGui.beginPopupModal("Saved", new ImBoolean(true), ImGuiWindowFlags.NoResize)) {
+                        ImGui.text("Your menu config has been saved");
+                        ImGui.endPopup();
                     }
 
                     ImGui.popStyleVar();
-
                     ImGui.endTabItem();
                 }
 
