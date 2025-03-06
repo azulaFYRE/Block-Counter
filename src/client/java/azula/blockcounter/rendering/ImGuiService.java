@@ -1,5 +1,6 @@
 package azula.blockcounter.rendering;
 
+import azula.blockcounter.BlockCounterClient;
 import azula.blockcounter.Shape;
 import azula.blockcounter.config.ImGuiConfig;
 import azula.blockcounter.config.ImGuiConfigService;
@@ -184,7 +185,9 @@ public class ImGuiService {
                     ImGui.text("Shape");
 
                     // empty string makes dropdown break :/
-                    ImGui.combo(" ", selectedShape, shapeOptions);
+                    if (ImGui.combo(" ", selectedShape, shapeOptions)) {
+                        BlockCounterClient.getInstance().shapeChanged();
+                    }
 
                     Shape selected = Shape.parseInt(selectedShape.get());
 

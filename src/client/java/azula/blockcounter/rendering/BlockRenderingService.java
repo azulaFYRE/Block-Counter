@@ -12,10 +12,10 @@ import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.math.Vec3i;
 import net.minecraft.world.RaycastContext;
 
 import java.awt.Color;
+import java.util.List;
 
 
 public class BlockRenderingService {
@@ -36,8 +36,6 @@ public class BlockRenderingService {
         this.renderColor = new Color(renderRGBA, true);
         this.edgeColor = new Color(edgeRGBA, true);
         this.renderType = config.renderType;
-
-        Renderer3d.renderThroughWalls();
     }
 
     public void renderStandingSelection(MatrixStack stack, Vec3d firstPos, BlockCounterModMenuConfig config) {
@@ -89,7 +87,6 @@ public class BlockRenderingService {
             renderBlockPos = lockPos;
         }
 
-
         int length = ImGuiService.length[0];
         int width = ImGuiService.width[0];
         int height = ImGuiService.height[0];
@@ -98,15 +95,143 @@ public class BlockRenderingService {
 
         this.setRenderColors(config);
 
-        Vec3d renderPos = new Vec3d(renderBlockPos.getX(), renderBlockPos.getY(), renderBlockPos.getZ());
+        Vec3d renderPos = Vec3d.of(renderBlockPos);
         renderPos = renderPos.add(offset);
 
+        Vec3d blockDimension = new Vec3d(1, 1, 1);
+
+        Vec3d toAddX = new Vec3d(1, 0, 0);
+        Vec3d toAddY = new Vec3d(0, 1, 0);
+        Vec3d toAddZ = new Vec3d(0, 0, 1);
+
+        Vec3d bottomY = new Vec3d(renderPos.x, renderPos.y, renderPos.z);
+        Vec3d topY = new Vec3d(renderPos.x, renderPos.y + dimensions.y - 1, renderPos.z);
+
+        Vec3d frontX = new Vec3d(renderPos.x, renderPos.y + 1, renderPos.z);
+        Vec3d backX = new Vec3d(renderPos.x + dimensions.x - 1, renderPos.y + 1, renderPos.z);
+
+        Vec3d leftZ = new Vec3d(renderPos.x + 1, renderPos.y + 1, renderPos.z);
+        Vec3d rightZ = new Vec3d(renderPos.x + 1, renderPos.y + 1, renderPos.z + dimensions.z - 1);
+
+        Renderer3d.stopRenderThroughWalls();
+
         if (this.renderType.equals(RenderType.SOLID)) {
-            Renderer3d.renderFilled(stack, this.renderColor, renderPos, dimensions);
-        } else if (this.renderType.equals(RenderType.EDGE_ONLY)) {
-            Renderer3d.renderOutline(stack, this.edgeColor, renderPos, dimensions);
+
+            // top and bottom
+            Vec3d topBottomDims = new Vec3d(dimensions.x, 1, dimensions.z);
+            Renderer3d.renderFilled(stack, this.renderColor, bottomY, topBottomDims);
+            if (height > 1) Renderer3d.renderFilled(stack, this.renderColor, topY, topBottomDims);
+
+            // front and back
+            Vec3d frontBackDims = new Vec3d(1, dimensions.y - 2, dimensions.z);
+            Renderer3d.renderFilled(stack, this.renderColor, frontX, frontBackDims);
+            if (height > 1) Renderer3d.renderFilled(stack, this.renderColor, backX, frontBackDims);
+
+            // left and right
+            Vec3d leftRightDims = new Vec3d(dimensions.x - 2, dimensions.y - 2, 1);
+            Renderer3d.renderFilled(stack, this.renderColor, leftZ, leftRightDims);
+            if (height > 1) Renderer3d.renderFilled(stack, this.renderColor, rightZ, leftRightDims);
         } else {
-            Renderer3d.renderEdged(stack, this.renderColor, this.edgeColor, renderPos, dimensions);
+
+            // top and bottom
+            for (int z = 0; z < width; z++) {
+                for (int x = 0; x < length; x++) {
+                    if (this.renderType.equals(RenderType.EDGE_ONLY)) {
+                        Renderer3d.renderOutline(stack, this.edgeColor, bottomY, blockDimension);
+                        if (height > 1) Renderer3d.renderOutline(stack, this.edgeColor, topY, blockDimension);
+                    } else {
+                        Renderer3d.renderEdged(stack, this.renderColor, this.edgeColor, bottomY, blockDimension);
+                        if (height > 1) Renderer3d.renderEdged(stack, this.renderColor, this.edgeColor, topY, blockDimension);
+                    }
+
+                    bottomY = bottomY.add(toAddX);
+                    topY = topY.add(toAddX);
+                }
+                bottomY = new Vec3d(renderPos.x, bottomY.y, bottomY.z);
+                bottomY = bottomY.add(toAddZ);
+                topY = new Vec3d(renderPos.x, topY.y, topY.z);
+                topY = topY.add(toAddZ);
+            }
+
+            // front and back
+            for (int y = 0; y < height - 2; y++) {
+                for (int z = 0; z < width; z++) {
+                    if (this.renderType.equals(RenderType.EDGE_ONLY)) {
+                        Renderer3d.renderOutline(stack, this.edgeColor, frontX, blockDimension);
+                        if (length > 1) Renderer3d.renderOutline(stack, this.edgeColor, backX, blockDimension);
+                    } else {
+                        Renderer3d.renderEdged(stack, this.renderColor, this.edgeColor, frontX, blockDimension);
+                        if (length > 1) Renderer3d.renderEdged(stack, this.renderColor, this.edgeColor, backX, blockDimension);
+                    }
+
+                    frontX = frontX.add(toAddZ);
+                    backX = backX.add(toAddZ);
+                }
+
+                frontX = new Vec3d(frontX.x, frontX.y, renderPos.z);
+                frontX = frontX.add(toAddY);
+                backX = new Vec3d(backX.x, backX.y, renderPos.z);
+                backX = backX.add(toAddY);
+            }
+
+            // left and right
+            for (int y = 0; y < height - 2; y++) {
+                for (int x = 0; x < length - 2; x++) {
+                    if (this.renderType.equals(RenderType.EDGE_ONLY)) {
+                        Renderer3d.renderOutline(stack, this.edgeColor, leftZ, blockDimension);
+                        if (width > 1) Renderer3d.renderOutline(stack, this.edgeColor, rightZ, blockDimension);
+                    } else {
+                        Renderer3d.renderEdged(stack, this.renderColor, this.edgeColor, leftZ, blockDimension);
+                        if (width > 1) Renderer3d.renderEdged(stack, this.renderColor, this.edgeColor, rightZ, blockDimension);
+                    }
+
+                    leftZ = leftZ.add(toAddX);
+                    rightZ = rightZ.add(toAddX);
+                }
+                leftZ = new Vec3d(renderPos.x + 1, leftZ.y, leftZ.z);
+                leftZ = leftZ.add(toAddY);
+                rightZ = new Vec3d(renderPos.x + 1, rightZ.y, rightZ.z);
+                rightZ = rightZ.add(toAddY);
+            }
+
+        }
+
+        Renderer3d.renderThroughWalls();
+    }
+
+    public void renderCircle(MatrixStack stack, BlockPos lockPos, BlockCounterModMenuConfig config) {
+
+        Vec3d offset = new Vec3d(ImGuiService.xOffset[0], ImGuiService.yOffset[0], ImGuiService.zOffset[0]);
+
+        BlockPos centerPos;
+        if (lockPos == null) {
+            // First pos is either from where player is standing or where they are looking
+            if (config.activationMethod.equals(ActivationMethod.STANDING)) {
+                centerPos = BlockPos.ofFloored(
+                        MinecraftClient.getInstance().player.getPos()
+                                .subtract(new Vec3d(0, 1, 0)));
+            } else {
+                Vec3d crosshairPos = getCrosshairBlockPos();
+                if (crosshairPos == null) return;
+                centerPos = BlockPos.ofFloored(crosshairPos);
+
+            }
+        } else {
+            centerPos = lockPos;
+        }
+
+        int radius = ImGuiService.radius[0];
+        int height = ImGuiService.circleHeight[0];
+        
+
+        this.setRenderColors(config);
+
+        if (this.renderType.equals(RenderType.SOLID)) {
+
+        } else if (this.renderType.equals(RenderType.EDGE_ONLY)) {
+
+        } else {
+
         }
     }
 
@@ -150,6 +275,22 @@ public class BlockRenderingService {
 
     private void renderLine(BlockCounterModMenuConfig config, MatrixStack stack, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
 
+        if (ImGuiService.axisAligned.get()) {
+
+            if (!ImGuiService.twoAxis.get()) {
+                this.renderSingleLine(config, stack, firstPos, secondPos, isClick);
+            } else {
+                this.renderDoubleLine(config, stack, firstPos, secondPos, isClick);
+            }
+
+        } else {
+            // render free form line
+        }
+
+    }
+
+    private void renderSingleLine(BlockCounterModMenuConfig config, MatrixStack stack, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
+
         this.setRenderColors(config);
 
         Vec3d firstPosInt = this.toIntVec(firstPos);
@@ -188,13 +329,69 @@ public class BlockRenderingService {
             renderPos = new Vec3d(renderPos.x, renderPos.y + 1, renderPos.z);
         }
 
+        Direction.Axis dir = BlockCalculations.findLargestAxisDiff(dimensions);
+
+        Vec3d blockDimension = new Vec3d(1, 1,1);
+        int stopIndex = (int) (dir.equals(Direction.Axis.X) ? dimensions.x :
+                (dir.equals(Direction.Axis.Y) ? dimensions.y : dimensions.z));
+        Vec3d toAdd = (dir.equals(Direction.Axis.X) ? new Vec3d(1, 0, 0) :
+                (dir.equals(Direction.Axis.Y) ? new Vec3d(0, 1, 0) : new Vec3d(0, 0, 1)));
+
+        Renderer3d.renderThroughWalls();
+
         if (this.renderType.equals(RenderType.SOLID)) {
             Renderer3d.renderFilled(stack, this.renderColor, renderPos, dimensions);
         } else if (this.renderType.equals(RenderType.EDGE_ONLY)) {
-            Renderer3d.renderOutline(stack, this.edgeColor, renderPos, dimensions);
+            // render individual blocks
+            for (int b = 0; b < stopIndex; b++) {
+                Renderer3d.renderOutline(stack, this.edgeColor, renderPos, blockDimension);
+                renderPos = renderPos.add(toAdd);
+            }
         } else {
-            Renderer3d.renderEdged(stack, this.renderColor, this.edgeColor, renderPos, dimensions);
+            for (int b = 0; b < stopIndex; b++) {
+                Renderer3d.renderEdged(stack, this.renderColor, this.edgeColor, renderPos, blockDimension);
+                renderPos = renderPos.add(toAdd);
+            }
         }
+
+        Renderer3d.stopRenderThroughWalls();
+
+    }
+
+    private void renderDoubleLine(BlockCounterModMenuConfig config, MatrixStack stack, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
+
+        Vec3d firstPosInt = this.toIntVec(firstPos);
+        Vec3d firstStart = new Vec3d(firstPosInt.x, firstPosInt.y - (isClick ? 0 : 1), firstPosInt.z);
+
+        Vec3d secondPosInt = this.toIntVec(secondPos);
+        Vec3d secondStart = new Vec3d(secondPosInt.x, secondPosInt.y - (isClick ? 0 : 1), secondPosInt.z);
+
+        List<Direction.Axis> largestDiffs = BlockCalculations.findTwoLargestAxisDiff(firstStart, secondStart);
+
+        Direction.Axis first = largestDiffs.getFirst();
+        Direction.Axis second = largestDiffs.get(1);
+
+        Vec3d firstEnd;
+        if (first.equals(Direction.Axis.X)) {
+            firstEnd = new Vec3d(secondStart.x, firstStart.y, firstStart.z);
+        } else if (first.equals(Direction.Axis.Y)) {
+            firstEnd = new Vec3d(firstStart.x, secondStart.y, firstStart.z);
+        } else {
+            firstEnd = new Vec3d(firstStart.x, firstStart.y, secondStart.z);
+        }
+
+        this.renderSingleLine(config, stack, firstStart, firstEnd, isClick);
+
+        Vec3d secondEnd;
+        if (second.equals(Direction.Axis.X)) {
+            secondEnd = new Vec3d(secondStart.x, firstEnd.y, firstEnd.z);
+        } else if (second.equals(Direction.Axis.Y)) {
+            secondEnd = new Vec3d(firstEnd.x, secondStart.y, firstEnd.z);
+        } else {
+            secondEnd = new Vec3d(firstEnd.x, firstEnd.y, secondStart.z);
+        }
+
+        this.renderSingleLine(config, stack, firstEnd, secondEnd, isClick);
 
     }
 

@@ -54,6 +54,8 @@ public class BlockCounterClient implements ClientModInitializer {
 
     private ImBoolean menuOpen = new ImBoolean(false);
 
+    private static BlockCounterClient instance;
+
     @Override
     public void onInitializeClient() {
         ConfigHolder<BlockCounterModMenuConfig> configHolder = AutoConfig
@@ -165,6 +167,7 @@ public class BlockCounterClient implements ClientModInitializer {
             }
         });
 
+        instance = this;
     }
 
     private void handleShapeSelection(Shape selected, MinecraftClient client) {
@@ -174,8 +177,8 @@ public class BlockCounterClient implements ClientModInitializer {
             } else {
                 handleClickActivation(client.player);
             }
-        } else if (selected.equals(Shape.QUAD)) {
-            handleQuad(client.player);
+        } else {
+            handleShape(client.player);
         }
     }
 
@@ -259,7 +262,7 @@ public class BlockCounterClient implements ClientModInitializer {
         }
     }
 
-    private void handleQuad(PlayerEntity player) {
+    private void handleShape(PlayerEntity player) {
 
         if (shapeStep.get().equals(ActivationStep.STARTED)) {
             shapeStep.set(ActivationStep.DURING);
@@ -299,9 +302,13 @@ public class BlockCounterClient implements ClientModInitializer {
                 }
                 break;
             case Shape.CIRCLE:
+                if (shapeStep.get().equals(ActivationStep.STARTED)) {
+                    blockRenderingService.renderCircle(context.matrixStack(), null, config);
+                } else if (shapeStep.get().equals(ActivationStep.DURING)) {
+                    blockRenderingService.renderCircle(context.matrixStack(), BlockPos.ofFloored(firstPosition), config);
+                }
                 break;
             case Shape.QUAD:
-
                 if (shapeStep.get().equals(ActivationStep.STARTED)) {
                     blockRenderingService.renderQuad(context.matrixStack(), null, config);
                 } else if (shapeStep.get().equals(ActivationStep.DURING)) {
@@ -347,7 +354,17 @@ public class BlockCounterClient implements ClientModInitializer {
             );
         }
 
-        int dist = BlockCalculations.calculateBlocksOne(firstPosition, secondPosition, isClick);
+        int dist = 0;
+        if (ImGuiService.axisAligned.get()) {
+            if (!ImGuiService.twoAxis.get()) {
+                dist = BlockCalculations.calculateBlocksOne(firstPosition, secondPosition, isClick);
+            } else {
+                dist = BlockCalculations.calculateBlocksTwo(firstPosition, secondPosition, isClick);
+            }
+        } else {
+            System.out.println("Free-form line distance here");
+        }
+
 
         String distLong = "Distance: %s %s";
         String distShort = "D: %d";
@@ -360,6 +377,17 @@ public class BlockCounterClient implements ClientModInitializer {
                 false
         );
 
+    }
+
+    public static BlockCounterClient getInstance() {
+        return instance;
+    }
+
+    public void shapeChanged() {
+        this.firstPosition = null;
+        this.secondPosition = null;
+        this.clickStep.set(ActivationStep.FINISHED);
+        this.shapeStep.set(ActivationStep.FINISHED);
     }
 
 }
