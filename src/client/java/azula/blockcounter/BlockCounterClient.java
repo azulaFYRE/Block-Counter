@@ -26,6 +26,7 @@ import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
@@ -51,6 +52,8 @@ public class BlockCounterClient implements ClientModInitializer {
 
     private Vec3d firstPosition;
     private Vec3d secondPosition;
+
+    private Direction.Axis lookAxis = null;
 
     private ImBoolean menuOpen = new ImBoolean(false);
 
@@ -276,6 +279,7 @@ public class BlockCounterClient implements ClientModInitializer {
         } else if (shapeStep.get().equals(ActivationStep.DURING)) {
             shapeStep.set(ActivationStep.FINISHED);
             firstPosition = null;
+            lookAxis = null;
         } else {
             shapeStep.set(ActivationStep.STARTED);
             player.sendMessage(Text.literal("Activate again to place then destroy...")
@@ -303,9 +307,20 @@ public class BlockCounterClient implements ClientModInitializer {
                 break;
             case Shape.CIRCLE:
                 if (shapeStep.get().equals(ActivationStep.STARTED)) {
-                    blockRenderingService.renderCircle(context.matrixStack(), null, config);
+                    PlayerEntity player = MinecraftClient.getInstance().player;
+
+                    if (player.isSneaking()) {
+                        Vec3d crosshairPos = BlockRenderingService.getCrosshairBlockPos();
+                        lookAxis  = BlockCalculations.findLargestAxisDiff(crosshairPos,
+                                new Vec3d(player.getPos().x, player.getPos().y - 1, player.getPos().z));
+                    } else {
+                        lookAxis = null;
+                    }
+
+                    blockRenderingService.renderCircle(context.matrixStack(), null, lookAxis, config);
                 } else if (shapeStep.get().equals(ActivationStep.DURING)) {
-                    blockRenderingService.renderCircle(context.matrixStack(), BlockPos.ofFloored(firstPosition), config);
+
+                    blockRenderingService.renderCircle(context.matrixStack(), BlockPos.ofFloored(firstPosition), lookAxis, config);
                 }
                 break;
             case Shape.QUAD:
@@ -354,7 +369,7 @@ public class BlockCounterClient implements ClientModInitializer {
             );
         }
 
-        int dist = 0;
+        int dist;
         if (ImGuiService.axisAligned.get()) {
             if (!ImGuiService.twoAxis.get()) {
                 dist = BlockCalculations.calculateBlocksOne(firstPosition, secondPosition, isClick);
@@ -362,7 +377,7 @@ public class BlockCounterClient implements ClientModInitializer {
                 dist = BlockCalculations.calculateBlocksTwo(firstPosition, secondPosition, isClick);
             }
         } else {
-            System.out.println("Free-form line distance here");
+            dist = BlockCalculations.calculateBlocksFree(firstPosition, secondPosition, isClick);
         }
 
 
@@ -388,6 +403,7 @@ public class BlockCounterClient implements ClientModInitializer {
         this.secondPosition = null;
         this.clickStep.set(ActivationStep.FINISHED);
         this.shapeStep.set(ActivationStep.FINISHED);
+        this.lookAxis = null;
     }
 
 }

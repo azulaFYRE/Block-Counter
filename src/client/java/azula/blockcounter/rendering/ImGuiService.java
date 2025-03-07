@@ -4,6 +4,7 @@ import azula.blockcounter.BlockCounterClient;
 import azula.blockcounter.Shape;
 import azula.blockcounter.config.ImGuiConfig;
 import azula.blockcounter.config.ImGuiConfigService;
+import azula.blockcounter.util.BlockCalculations;
 import imgui.ImGui;
 import imgui.ImGuiIO;
 import imgui.ImVec2;
@@ -224,9 +225,8 @@ public class ImGuiService {
                         ImGui.separator();
 
                         totalBlocks = switch (selected) {
-                            case LINE -> 1;
                             case QUAD -> length[0] * width[0] * height[0];
-                            case CIRCLE -> 1;
+                            case CIRCLE -> BlockCalculations.calculateBlocksCircle();
                             default -> 1;
                         };
 

@@ -15,6 +15,7 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.RaycastContext;
 
 import java.awt.Color;
+import java.util.ArrayList;
 import java.util.List;
 
 
@@ -199,43 +200,108 @@ public class BlockRenderingService {
         Renderer3d.renderThroughWalls();
     }
 
-    public void renderCircle(MatrixStack stack, BlockPos lockPos, BlockCounterModMenuConfig config) {
+    public void renderCircle(MatrixStack stack, BlockPos lockPos, Direction.Axis lockAxis, BlockCounterModMenuConfig config) {
 
         Vec3d offset = new Vec3d(ImGuiService.xOffset[0], ImGuiService.yOffset[0], ImGuiService.zOffset[0]);
 
-        BlockPos centerPos;
+        BlockPos centerBlockPos;
+
         if (lockPos == null) {
             // First pos is either from where player is standing or where they are looking
             if (config.activationMethod.equals(ActivationMethod.STANDING)) {
-                centerPos = BlockPos.ofFloored(
+                centerBlockPos = BlockPos.ofFloored(
                         MinecraftClient.getInstance().player.getPos()
                                 .subtract(new Vec3d(0, 1, 0)));
             } else {
                 Vec3d crosshairPos = getCrosshairBlockPos();
                 if (crosshairPos == null) return;
-                centerPos = BlockPos.ofFloored(crosshairPos);
-
+                centerBlockPos = BlockPos.ofFloored(crosshairPos);
             }
         } else {
-            centerPos = lockPos;
+            centerBlockPos = lockPos;
         }
+
+        Vec3d centerPos = Vec3d.of(centerBlockPos);
+        centerPos = centerPos.add(offset);
 
         int radius = ImGuiService.radius[0];
         int height = ImGuiService.circleHeight[0];
-        
+
+        List<Vec3d> renderPoints = new ArrayList<>();
+
+        int rr = radius * radius;
+
+        // Random inefficient algorithm from stack overflow
+        // https://stackoverflow.com/questions/1201200/fast-algorithm-for-drawing-filled-circles
+
+        for (int x = -radius; x <= radius; x++) {
+            for (int z = -radius; z <= radius; z++) {
+                int xx = x * x;
+                int zz = z * z;
+
+                if (xx + zz < rr + radius) {
+                    Vec3d toAddBottom = new Vec3d(x, 0, z);
+                    if (lockAxis != null) {
+                        if (lockAxis.equals(Direction.Axis.X)) {
+                            toAddBottom = new Vec3d(0, z, x);
+                        } else if (lockAxis.equals(Direction.Axis.Z)){
+                            toAddBottom = new Vec3d(x, z, 0);
+                        }
+                    }
+
+                    renderPoints.add(centerPos.add(toAddBottom));
+
+                    if (height > 1) {
+                        Vec3d toAddTop = new Vec3d(x, height, z);
+                        if (lockAxis != null) {
+                            if (lockAxis.equals(Direction.Axis.X)) {
+                                toAddTop = new Vec3d(height, z, x);
+                            } else if (lockAxis.equals(Direction.Axis.Z)){
+                                toAddTop = new Vec3d(x, z, height);
+                            }
+                        }
+
+                        renderPoints.add(centerPos.add(toAddTop));
+
+                        if (xx + zz > rr - radius) {
+                            for (int y = 1; y < height; y++) {
+                                Vec3d toAddSides = new Vec3d(x, y, z);
+                                if (lockAxis != null) {
+                                    if (lockAxis.equals(Direction.Axis.X)) {
+                                        toAddSides = new Vec3d(y, z, x);
+                                    } else if (lockAxis.equals(Direction.Axis.Z)){
+                                        toAddSides = new Vec3d(x, z, y);
+                                    }
+                                }
+                                renderPoints.add(centerPos.add(toAddSides));
+                            }
+                        }
+                    }
+
+                }
+            }
+        }
 
         this.setRenderColors(config);
+        Vec3d blockDimension = new Vec3d(1, 1, 1);
 
-        if (this.renderType.equals(RenderType.SOLID)) {
+        Renderer3d.stopRenderThroughWalls();
 
-        } else if (this.renderType.equals(RenderType.EDGE_ONLY)) {
-
-        } else {
-
+        for (Vec3d point : renderPoints) {
+            if (this.renderType.equals(RenderType.SOLID)) {
+                Renderer3d.renderFilled(stack, this.renderColor, point, blockDimension);
+            } else if (this.renderType.equals(RenderType.EDGE_ONLY)) {
+                Renderer3d.renderOutline(stack, this.edgeColor, point, blockDimension);
+            } else {
+                Renderer3d.renderEdged(stack, this.renderColor, this.edgeColor, point, blockDimension);
+            }
         }
+
+        Renderer3d.renderThroughWalls();
+
     }
 
-    public Vec3d getCrosshairBlockPos() {
+    public static Vec3d getCrosshairBlockPos() {
 
         MinecraftClient client = MinecraftClient.getInstance();
         ClientPlayerEntity player = MinecraftClient.getInstance().player;
@@ -269,7 +335,7 @@ public class BlockRenderingService {
         return null;
     }
 
-    private Vec3d toIntVec(Vec3d vec) {
+    public static Vec3d toIntVec(Vec3d vec) {
         return new Vec3d((int) vec.x, (int) vec.y, (int) vec.z);
     }
 
@@ -284,7 +350,7 @@ public class BlockRenderingService {
             }
 
         } else {
-            // render free form line
+            this.renderFreeLine(config, stack, firstPos, secondPos, isClick);
         }
 
     }
@@ -393,6 +459,111 @@ public class BlockRenderingService {
 
         this.renderSingleLine(config, stack, firstEnd, secondEnd, isClick);
 
+    }
+
+    // 3D Line Drawing algorithm with slight tweaks
+    // https://www.geeksforgeeks.org/bresenhams-algorithm-for-3-d-line-drawing/
+    private void renderFreeLine(BlockCounterModMenuConfig config, MatrixStack stack, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
+        Vec3d firstPosInt = this.toIntVec(firstPos);
+        Vec3d secondPosInt = this.toIntVec(secondPos);
+
+        Vec3d startPos = new Vec3d(firstPosInt.x, firstPosInt.y - (isClick ? 0 : 1), firstPosInt.z);
+        Vec3d endPos = new Vec3d(secondPosInt.x, secondPosInt.y, secondPosInt.z);
+
+        int x = (int) startPos.x;
+        int y = (int) startPos.y;
+        int z = (int) startPos.z;
+
+        int dy = Math.abs(((int) endPos.y) - y);
+        int dx = Math.abs(((int) endPos.x) - x);
+        int dz = Math.abs(((int) endPos.z) - z);
+
+        List<Vec3d> renderPoints = new ArrayList<>();
+        renderPoints.add(startPos);
+
+        Vec3d xs, ys, zs;
+
+        xs = new Vec3d(endPos.x > startPos.x ? 1 : -1, 0, 0);
+        ys = new Vec3d(0, endPos.y > startPos.y ? 1 : -1, 0);
+        zs = new Vec3d(0, 0, endPos.z > startPos.z ? 1 : -1);
+
+        Direction.Axis largestDiff = BlockCalculations.findLargestAxisDiff(startPos, endPos);
+
+        if (largestDiff.equals(Direction.Axis.X)) {
+            int p1 = 2 * dy - dx;
+            int p2 = 2 * dz - dx;
+
+            while (startPos.x != endPos.x) {
+                startPos = startPos.add(xs);
+                if (p1 >= 0) {
+                    startPos = startPos.add(ys);
+                    p1 -= 2 * dx;
+                }
+                if (p2 >= 0) {
+                    startPos = startPos.add(zs);
+                    p2 -= 2 * dx;
+                }
+                p1 += 2 * dy;
+                p2 += 2 * dz;
+                renderPoints.add(new Vec3d(startPos.x, startPos.y, startPos.z));
+            }
+        } else if (largestDiff.equals(Direction.Axis.Y)) {
+            int p1 = 2 * dx - dy;
+            int p2 = 2 * dz - dy;
+
+            while (startPos.y != endPos.y) {
+                startPos = startPos.add(ys);
+                if (p1 >= 0) {
+                    startPos = startPos.add(xs);
+                    p1 -= 2 * dy;
+                }
+                if (p2 >= 0) {
+                    startPos = startPos.add(zs);
+                    p2 -= 2 * dy;
+                }
+                p1 += 2 * dx;
+                p2 += 2 * dz;
+                renderPoints.add(new Vec3d(startPos.x, startPos.y, startPos.z));
+            }
+        } else {
+            int p1 = 2 * dy - dz;
+            int p2 = 2 * dx - dz;
+
+            while (startPos.z != endPos.z) {
+                startPos = startPos.add(zs);
+                if (p1 >= 0) {
+                    startPos = startPos.add(ys);
+                    p1 -= 2 * dz;
+                }
+                if (p2 >= 0) {
+                    startPos = startPos.add(xs);
+                    p2 -= 2 * dz;
+                }
+                p1 += 2 * dy;
+                p2 += 2 * dx;
+                renderPoints.add(new Vec3d(startPos.x, startPos.y, startPos.z));
+            }
+        }
+
+        this.setRenderColors(config);
+
+        Vec3d blockDimension = new Vec3d(1, 1, 1);
+
+        Renderer3d.renderThroughWalls();
+
+        for (Vec3d point : renderPoints) {
+
+            if (this.renderType.equals(RenderType.SOLID)) {
+                Renderer3d.renderFilled(stack, this.renderColor, point, blockDimension);
+            } else if (this.renderType.equals(RenderType.EDGE_ONLY)) {
+                Renderer3d.renderOutline(stack, this.edgeColor, point, blockDimension);
+            } else {
+                Renderer3d.renderEdged(stack, this.renderColor, this.edgeColor, point, blockDimension);
+            }
+
+        }
+
+        Renderer3d.stopRenderThroughWalls();
     }
 
     private Vec3d findDimensions(Vec3d firstPos, Vec3d secondPos) {

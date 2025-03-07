@@ -1,5 +1,7 @@
 package azula.blockcounter.util;
 
+import azula.blockcounter.rendering.BlockRenderingService;
+import azula.blockcounter.rendering.ImGuiService;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
 
@@ -73,6 +75,116 @@ public class BlockCalculations {
 
         // - 1 for the intersection between the two
         return firstTotal + secondTotal - 1;
+    }
+
+    public static int calculateBlocksFree(Vec3d firstPos, Vec3d secondPos, boolean isClick) {
+        Vec3d firstPosInt = BlockRenderingService.toIntVec(firstPos);
+        Vec3d secondPosInt = BlockRenderingService.toIntVec(secondPos);
+
+        Vec3d startPos = new Vec3d(firstPosInt.x, firstPosInt.y - (isClick ? 0 : 1), firstPosInt.z);
+        Vec3d endPos = new Vec3d(secondPosInt.x, secondPosInt.y, secondPosInt.z);
+
+        int x = (int) startPos.x;
+        int y = (int) startPos.y;
+        int z = (int) startPos.z;
+
+        int dy = Math.abs(((int) endPos.y) - y);
+        int dx = Math.abs(((int) endPos.x) - x);
+        int dz = Math.abs(((int) endPos.z) - z);
+
+        int totalBlocks = 1;
+
+        Vec3d xs, ys, zs;
+
+        xs = new Vec3d(endPos.x > startPos.x ? 1 : -1, 0, 0);
+        ys = new Vec3d(0, endPos.y > startPos.y ? 1 : -1, 0);
+        zs = new Vec3d(0, 0, endPos.z > startPos.z ? 1 : -1);
+
+        Direction.Axis largestDiff = BlockCalculations.findLargestAxisDiff(startPos, endPos);
+
+        if (largestDiff.equals(Direction.Axis.X)) {
+            int p1 = 2 * dy - dx;
+            int p2 = 2 * dz - dx;
+
+            while (startPos.x != endPos.x) {
+                startPos = startPos.add(xs);
+                if (p1 >= 0) {
+                    startPos = startPos.add(ys);
+                    p1 -= 2 * dx;
+                }
+                if (p2 >= 0) {
+                    startPos = startPos.add(zs);
+                    p2 -= 2 * dx;
+                }
+                p1 += 2 * dy;
+                p2 += 2 * dz;
+                totalBlocks++;
+            }
+        } else if (largestDiff.equals(Direction.Axis.Y)) {
+            int p1 = 2 * dx - dy;
+            int p2 = 2 * dz - dy;
+
+            while (startPos.y != endPos.y) {
+                startPos = startPos.add(ys);
+                if (p1 >= 0) {
+                    startPos = startPos.add(xs);
+                    p1 -= 2 * dy;
+                }
+                if (p2 >= 0) {
+                    startPos = startPos.add(zs);
+                    p2 -= 2 * dy;
+                }
+                p1 += 2 * dx;
+                p2 += 2 * dz;
+                totalBlocks++;
+            }
+        } else {
+            int p1 = 2 * dy - dz;
+            int p2 = 2 * dx - dz;
+
+            while (startPos.z != endPos.z) {
+                startPos = startPos.add(zs);
+                if (p1 >= 0) {
+                    startPos = startPos.add(ys);
+                    p1 -= 2 * dz;
+                }
+                if (p2 >= 0) {
+                    startPos = startPos.add(xs);
+                    p2 -= 2 * dz;
+                }
+                p1 += 2 * dy;
+                p2 += 2 * dx;
+                totalBlocks++;
+            }
+        }
+
+        return totalBlocks;
+    }
+
+    public static int calculateBlocksCircle() {
+        int radius = ImGuiService.radius[0];
+        int height = ImGuiService.circleHeight[0];
+
+        int totalPoints = 0;
+
+        int rr = radius * radius;
+
+        // Random inefficient algorithm from stack overflow
+        // https://stackoverflow.com/questions/1201200/fast-algorithm-for-drawing-filled-circles
+        for (int x = -radius; x <= radius; x++) {
+            for (int z = -radius; z <= radius; z++) {
+                int xx = x * x;
+                int zz = z * z;
+
+                if (xx + zz < rr + radius) {
+                    totalPoints++;
+                }
+            }
+        }
+
+        if (height > 1) totalPoints *= height;
+
+        return totalPoints;
     }
 
     public static List<Direction.Axis> findTwoLargestAxisDiff(Vec3d firstPos, Vec3d secondPos) {
