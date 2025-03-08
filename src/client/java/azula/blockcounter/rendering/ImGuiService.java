@@ -28,6 +28,9 @@ public class ImGuiService {
 
     public static ImBoolean axisAligned = new ImBoolean(true);
     public static ImBoolean twoAxis = new ImBoolean(false);
+    public static ImBoolean isSphere = new ImBoolean(false);
+
+    public static ImBoolean calcUsingRendered = new ImBoolean(false);
 
     // Sliders store the value in an array, don't ask me why
     // Quad
@@ -123,6 +126,19 @@ public class ImGuiService {
         ImGui.destroyContext();
     }
 
+    private static void updateTotalBlocks() {
+        Shape selected = Shape.parseInt(selectedShape.get());
+
+        if (selected.equals(Shape.QUAD)) {
+            totalBlocks = BlockCalculations.calculateBlocksQuad();
+        } else if (selected.equals(Shape.CIRCLE)) {
+            totalBlocks = isSphere.get() ? BlockCalculations.calculateBlocksSphere()
+                    : BlockCalculations.calculateBlocksCircle();
+        } else {
+            totalBlocks = 1;
+        }
+    }
+
     public static void renderMenu() throws IOException {
 
         float[] lastColor = accentColor.clone();
@@ -188,6 +204,7 @@ public class ImGuiService {
                     // empty string makes dropdown break :/
                     if (ImGui.combo(" ", selectedShape, shapeOptions)) {
                         BlockCounterClient.getInstance().shapeChanged();
+                        updateTotalBlocks();
                     }
 
                     Shape selected = Shape.parseInt(selectedShape.get());
@@ -201,17 +218,26 @@ public class ImGuiService {
                         }
                     }
 
+                    boolean bLen = false;
+                    boolean bWdt = false;
+                    boolean bHgt = false;
+                    boolean bRad = false;
+                    boolean bSpr = false;
+                    boolean bCHgt = false;
+
                     // Quad Config
                     if (selected.equals(Shape.QUAD)) {
-                        ImGui.sliderInt("Length", length, MIN, MAX, ImGuiSliderFlags.AlwaysClamp);
-                        ImGui.sliderInt("Width", width, MIN, MAX, ImGuiSliderFlags.AlwaysClamp);
-                        ImGui.sliderInt("Height", height, MIN, MAX, ImGuiSliderFlags.AlwaysClamp);
+                        bLen = ImGui.sliderInt("Length", length, MIN, MAX, ImGuiSliderFlags.AlwaysClamp);
+                        bWdt = ImGui.sliderInt("Width", width, MIN, MAX, ImGuiSliderFlags.AlwaysClamp);
+                        bHgt = ImGui.sliderInt("Height", height, MIN, MAX, ImGuiSliderFlags.AlwaysClamp);
                     }
+
 
                     // Circle Config
                     if (selected.equals(Shape.CIRCLE)) {
-                        ImGui.sliderInt("Radius", radius, MIN, MAX, ImGuiSliderFlags.AlwaysClamp);
-                        ImGui.sliderInt("Height", circleHeight, MIN, MAX, ImGuiSliderFlags.AlwaysClamp);
+                        bRad = ImGui.sliderInt("Radius", radius, MIN, MAX, ImGuiSliderFlags.AlwaysClamp);
+                        bSpr = ImGui.checkbox("Sphere", isSphere);
+                        if (!isSphere.get()) bCHgt = ImGui.sliderInt("Height", circleHeight, MIN, MAX, ImGuiSliderFlags.AlwaysClamp);
                     }
 
                     // Offset
@@ -224,11 +250,21 @@ public class ImGuiService {
 
                         ImGui.separator();
 
-                        totalBlocks = switch (selected) {
-                            case QUAD -> length[0] * width[0] * height[0];
-                            case CIRCLE -> BlockCalculations.calculateBlocksCircle();
-                            default -> 1;
-                        };
+                        boolean bCalc = ImGui.checkbox("Calculate using rendered blocks only", calcUsingRendered);
+
+                        ImGui.sameLine();
+                        ImGui.textDisabled("(?)");
+                        if (ImGui.beginItemTooltip()) {
+                            ImGui.pushTextWrapPos(ImGui.getFontSize() * 35.0f);
+                            ImGui.textUnformatted("By default, all blocks that would be inside the entire shape are computed. " +
+                                    "With this option checked, only the blocks that you see rendered are added in the total.");
+                            ImGui.popTextWrapPos();
+                            ImGui.endTooltip();
+                        }
+
+                        if (bLen || bWdt || bHgt || bRad || bSpr || bCHgt || bCalc) {
+                            updateTotalBlocks();
+                        }
 
                         ImGui.text("Total Blocks: " + totalBlocks);
                     }

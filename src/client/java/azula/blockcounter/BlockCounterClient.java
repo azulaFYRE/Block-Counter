@@ -276,13 +276,17 @@ public class BlockCounterClient implements ClientModInitializer {
                 firstPosition = blockRenderingService.getCrosshairBlockPos();
             }
 
+            player.sendMessage(Text.literal("Activate again to destroy...")
+                            .formatted(Random.chatColorToFormat(config.chatColor)),
+                    false);
+
         } else if (shapeStep.get().equals(ActivationStep.DURING)) {
             shapeStep.set(ActivationStep.FINISHED);
             firstPosition = null;
             lookAxis = null;
         } else {
             shapeStep.set(ActivationStep.STARTED);
-            player.sendMessage(Text.literal("Activate again to place then destroy...")
+            player.sendMessage(Text.literal("Activate again to place...")
                             .formatted(Random.chatColorToFormat(config.chatColor)),
                     false);
         }
@@ -311,7 +315,7 @@ public class BlockCounterClient implements ClientModInitializer {
 
                     if (player.isSneaking()) {
                         Vec3d crosshairPos = BlockRenderingService.getCrosshairBlockPos();
-                        lookAxis  = BlockCalculations.findLargestAxisDiff(crosshairPos,
+                        lookAxis = BlockCalculations.findLargestAxisDiff(crosshairPos,
                                 new Vec3d(player.getPos().x, player.getPos().y - 1, player.getPos().z));
                     } else {
                         lookAxis = null;

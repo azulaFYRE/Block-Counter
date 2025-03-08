@@ -201,7 +201,14 @@ public class BlockRenderingService {
     }
 
     public void renderCircle(MatrixStack stack, BlockPos lockPos, Direction.Axis lockAxis, BlockCounterModMenuConfig config) {
+        if (!ImGuiService.isSphere.get()) {
+            this.render2DCircle(stack, lockPos, lockAxis, config);
+        } else {
+            this.renderSphere(stack, lockPos, lockAxis, config);
+        }
+    }
 
+    private void render2DCircle(MatrixStack stack, BlockPos lockPos, Direction.Axis lockAxis, BlockCounterModMenuConfig config) {
         Vec3d offset = new Vec3d(ImGuiService.xOffset[0], ImGuiService.yOffset[0], ImGuiService.zOffset[0]);
 
         BlockPos centerBlockPos;
@@ -252,19 +259,19 @@ public class BlockRenderingService {
                     renderPoints.add(centerPos.add(toAddBottom));
 
                     if (height > 1) {
-                        Vec3d toAddTop = new Vec3d(x, height, z);
+                        Vec3d toAddTop = new Vec3d(x, height - 1, z);
                         if (lockAxis != null) {
                             if (lockAxis.equals(Direction.Axis.X)) {
-                                toAddTop = new Vec3d(height, z, x);
+                                toAddTop = new Vec3d(height - 1, z, x);
                             } else if (lockAxis.equals(Direction.Axis.Z)){
-                                toAddTop = new Vec3d(x, z, height);
+                                toAddTop = new Vec3d(x, z, height - 1);
                             }
                         }
 
                         renderPoints.add(centerPos.add(toAddTop));
 
                         if (xx + zz > rr - radius) {
-                            for (int y = 1; y < height; y++) {
+                            for (int y = 1; y < height - 1; y++) {
                                 Vec3d toAddSides = new Vec3d(x, y, z);
                                 if (lockAxis != null) {
                                     if (lockAxis.equals(Direction.Axis.X)) {
@@ -298,7 +305,71 @@ public class BlockRenderingService {
         }
 
         Renderer3d.renderThroughWalls();
+    }
 
+    private void renderSphere(MatrixStack stack, BlockPos lockPos, Direction.Axis lockAxis, BlockCounterModMenuConfig config) {
+        Vec3d offset = new Vec3d(ImGuiService.xOffset[0], ImGuiService.yOffset[0], ImGuiService.zOffset[0]);
+
+        BlockPos centerBlockPos;
+
+        if (lockPos == null) {
+            // First pos is either from where player is standing or where they are looking
+            if (config.activationMethod.equals(ActivationMethod.STANDING)) {
+                centerBlockPos = BlockPos.ofFloored(
+                        MinecraftClient.getInstance().player.getPos()
+                                .subtract(new Vec3d(0, 1, 0)));
+            } else {
+                Vec3d crosshairPos = getCrosshairBlockPos();
+                if (crosshairPos == null) return;
+                centerBlockPos = BlockPos.ofFloored(crosshairPos);
+            }
+        } else {
+            centerBlockPos = lockPos;
+        }
+
+        Vec3d centerPos = Vec3d.of(centerBlockPos);
+        centerPos = centerPos.add(offset);
+
+        int radius = ImGuiService.radius[0];
+
+        List<Vec3d> renderPoints = new ArrayList<>();
+
+        int rr = radius * radius;
+
+        // Random inefficient algorithm from stack overflow
+        // https://stackoverflow.com/questions/1201200/fast-algorithm-for-drawing-filled-circles
+
+        for (int x = -radius; x <= radius; x++) {
+            for (int z = -radius; z <= radius; z++) {
+                for (int y = -radius; y <= radius; y++) {
+                    int xx = x * x;
+                    int yy = y * y;
+                    int zz = z * z;
+
+                    if ((xx + yy + zz < rr + radius) && (xx + yy + zz > rr - radius)) {
+                        renderPoints.add(centerPos.add(new Vec3d(x, y, z)));
+                    }
+                }
+
+            }
+        }
+
+        this.setRenderColors(config);
+        Vec3d blockDimension = new Vec3d(1, 1, 1);
+
+        Renderer3d.stopRenderThroughWalls();
+
+        for (Vec3d point : renderPoints) {
+            if (this.renderType.equals(RenderType.SOLID)) {
+                Renderer3d.renderFilled(stack, this.renderColor, point, blockDimension);
+            } else if (this.renderType.equals(RenderType.EDGE_ONLY)) {
+                Renderer3d.renderOutline(stack, this.edgeColor, point, blockDimension);
+            } else {
+                Renderer3d.renderEdged(stack, this.renderColor, this.edgeColor, point, blockDimension);
+            }
+        }
+
+        Renderer3d.renderThroughWalls();
     }
 
     public static Vec3d getCrosshairBlockPos() {

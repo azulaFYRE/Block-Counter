@@ -161,6 +161,21 @@ public class BlockCalculations {
         return totalBlocks;
     }
 
+    public static int calculateBlocksQuad() {
+        int w = ImGuiService.width[0];
+        int l = ImGuiService.length[0];
+        int h = ImGuiService.height[0];
+
+        int totalBlocks = w * l * h;
+
+        if (ImGuiService.calcUsingRendered.get()) {
+            totalBlocks -= ((w - 2) * (l - 2) * (h - 2));
+        }
+
+
+        return totalBlocks;
+    }
+
     public static int calculateBlocksCircle() {
         int radius = ImGuiService.radius[0];
         int height = ImGuiService.circleHeight[0];
@@ -177,12 +192,62 @@ public class BlockCalculations {
                 int zz = z * z;
 
                 if (xx + zz < rr + radius) {
+                    // for the bottom
                     totalPoints++;
+
+                    if (ImGuiService.calcUsingRendered.get()) {
+                        if (height > 1) {
+                            // for the top
+                            totalPoints++;
+
+                            if (xx + zz > rr - radius) {
+                                // for the whole side if an edge
+                                totalPoints += height - 2;
+                            }
+                        }
+                    }
                 }
             }
         }
 
-        if (height > 1) totalPoints *= height;
+        if (!ImGuiService.calcUsingRendered.get()) {
+            if (height > 1) {
+                totalPoints *= height;
+            }
+        }
+
+        return totalPoints;
+    }
+
+    public static int calculateBlocksSphere() {
+        int radius = ImGuiService.radius[0];
+
+        int totalPoints = 0;
+        int rr = radius * radius;
+
+        for (int x = -radius; x <= radius; x++) {
+            for (int z = -radius; z <= radius; z++) {
+                for (int y = -radius; y <= radius; y++) {
+                    int xx = x * x;
+                    int yy = y * y;
+                    int zz = z * z;
+
+                    boolean inside = xx + yy + zz < rr + radius;
+
+                    if (ImGuiService.calcUsingRendered.get()) {
+                        if (inside && (xx + yy + zz > rr - radius)) {
+                            totalPoints++;
+                        }
+                    } else {
+                        if (inside) {
+                            totalPoints++;
+                        }
+                    }
+
+                }
+
+            }
+        }
 
         return totalPoints;
     }
