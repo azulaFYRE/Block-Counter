@@ -1,6 +1,7 @@
 package azula.blockcounter;
 
 import azula.blockcounter.config.BlockCounterModMenuConfig;
+import azula.blockcounter.config.MessageDisplay;
 import azula.blockcounter.event.LockCursorCallback;
 import azula.blockcounter.rendering.BlockRenderingService;
 import azula.blockcounter.rendering.ImGuiService;
@@ -196,7 +197,7 @@ public class BlockCounterClient implements ClientModInitializer {
                 player.sendMessage(
                         Text.literal("Activate again for second position...")
                                 .formatted(Random.chatColorToFormat(config.chatColor)),
-                        false
+                        !config.msgDisplayLocation.equals(MessageDisplay.CHAT)
                 );
             }
 
@@ -233,7 +234,7 @@ public class BlockCounterClient implements ClientModInitializer {
                 player.sendMessage(
                         Text.literal("Right click first position...")
                                 .formatted(Random.chatColorToFormat(config.chatColor)),
-                        false
+                        !config.msgDisplayLocation.equals(MessageDisplay.CHAT)
                 );
             }
 
@@ -248,7 +249,7 @@ public class BlockCounterClient implements ClientModInitializer {
                 player.sendMessage(
                         Text.literal("Block count aborted.")
                                 .formatted(Random.chatColorToFormat(config.chatColor)),
-                        false
+                        !config.msgDisplayLocation.equals(MessageDisplay.CHAT)
                 );
             }
 
@@ -277,7 +278,7 @@ public class BlockCounterClient implements ClientModInitializer {
                 player.sendMessage(
                         Text.literal("Right click second position...")
                                 .formatted(Random.chatColorToFormat(config.chatColor)),
-                        false
+                        !config.msgDisplayLocation.equals(MessageDisplay.CHAT)
                 );
             }
 
@@ -325,7 +326,7 @@ public class BlockCounterClient implements ClientModInitializer {
             if (config.showDirMessages) {
                 player.sendMessage(Text.literal("Activate again to destroy...")
                                 .formatted(Random.chatColorToFormat(config.chatColor)),
-                        false);
+                        !config.msgDisplayLocation.equals(MessageDisplay.CHAT));
             }
 
         } else if (shapeStep.get().equals(ActivationStep.DURING)) {
@@ -338,7 +339,7 @@ public class BlockCounterClient implements ClientModInitializer {
             if (config.showDirMessages) {
                 player.sendMessage(Text.literal("Activate again to place...")
                                 .formatted(Random.chatColorToFormat(config.chatColor)),
-                        false);
+                        !config.msgDisplayLocation.equals(MessageDisplay.CHAT));
             }
         }
     }
@@ -420,7 +421,7 @@ public class BlockCounterClient implements ClientModInitializer {
             player.sendMessage(Text.literal(
                                     simplify ? String.format(firstPosShort, first) : String.format(firstPosLong, first))
                             .formatted(Random.chatColorToFormat(config.chatColor)),
-                    false
+                    !config.msgDisplayLocation.equals(MessageDisplay.CHAT)
             );
         }
     }
@@ -438,7 +439,7 @@ public class BlockCounterClient implements ClientModInitializer {
             player.sendMessage(
                     Text.literal(simplify ? String.format(secondPosShort, second) : String.format(secondPosLong, second))
                             .formatted(Random.chatColorToFormat(config.chatColor)),
-                    false
+                    !config.msgDisplayLocation.equals(MessageDisplay.CHAT)
             );
         }
 
@@ -462,7 +463,7 @@ public class BlockCounterClient implements ClientModInitializer {
                                 String.format(distShort, dist)
                                 : String.format(distLong, dist, dist == 1 ? "block" : "blocks")))
                         .formatted(Random.chatColorToFormat(config.chatColor)),
-                false
+                !config.msgDisplayLocation.equals(MessageDisplay.CHAT)
         );
 
     }
