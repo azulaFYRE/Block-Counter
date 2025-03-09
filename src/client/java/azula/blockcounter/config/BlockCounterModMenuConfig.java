@@ -16,6 +16,9 @@ public class BlockCounterModMenuConfig implements ConfigData {
     public boolean showPosMessages = true;
 
     @ConfigEntry.Category("General")
+    public boolean showDirMessages = true;
+
+    @ConfigEntry.Category("General")
     public boolean simplifiedMessages = false;
 
     @ConfigEntry.Category("Customization")

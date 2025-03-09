@@ -74,7 +74,7 @@ public class BlockCalculations {
                 + (!isClick && second.equals(Direction.Axis.Y) ? 0 : 1);
 
         // - 1 for the intersection between the two
-        return firstTotal + secondTotal - 1;
+        return firstTotal + secondTotal - ((firstTotal != 0 && secondTotal != 0) ? 1 : 0);
     }
 
     public static int calculateBlocksFree(Vec3d firstPos, Vec3d secondPos, boolean isClick) {

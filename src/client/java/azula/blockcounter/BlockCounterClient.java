@@ -189,18 +189,36 @@ public class BlockCounterClient implements ClientModInitializer {
         if (standStep.get().equals(ActivationStep.FINISHED)) {
 
             BlockPos firstPos = BlockPos.ofFloored(player.getPos());
-            firstPosition = new Vec3d(firstPos.getX(), firstPos.getY(), firstPos.getZ());
+            firstPosition = Vec3d.of(firstPos);
             printFirst(player);
+
+            if (config.showDirMessages) {
+                player.sendMessage(
+                        Text.literal("Activate again for second position...")
+                                .formatted(Random.chatColorToFormat(config.chatColor)),
+                        false
+                );
+            }
 
             standStep.set(ActivationStep.STARTED);
 
         } else if (standStep.get().equals(ActivationStep.STARTED)) {
 
             BlockPos secondPos = BlockPos.ofFloored(player.getPos());
-            secondPosition = new Vec3d(secondPos.getX(), secondPos.getY(), secondPos.getZ());
+            secondPosition = Vec3d.of(secondPos);
 
             printSecond(player);
 
+            if (!ImGuiService.canPlaceLine.get()) {
+                firstPosition = null;
+                secondPosition = null;
+
+                standStep.set(ActivationStep.FINISHED);
+            } else {
+                standStep.set(ActivationStep.DURING);
+            }
+
+        } else if (standStep.get().equals(ActivationStep.DURING)) {
             firstPosition = null;
             secondPosition = null;
 
@@ -211,25 +229,34 @@ public class BlockCounterClient implements ClientModInitializer {
     private void handleClickActivation(PlayerEntity player) {
         if (clickStep.get().equals(ActivationStep.FINISHED)) {
 
-            player.sendMessage(
-                    Text.literal("Right click first position...")
-                            .formatted(Random.chatColorToFormat(config.chatColor)),
-                    false
-            );
+            if (config.showDirMessages) {
+                player.sendMessage(
+                        Text.literal("Right click first position...")
+                                .formatted(Random.chatColorToFormat(config.chatColor)),
+                        false
+                );
+            }
 
             firstPosition = null;
             secondPosition = null;
 
             clickStep.set(ActivationStep.STARTED);
 
+        } else if (clickStep.get().equals(ActivationStep.STARTED)) {
+
+            if (config.showDirMessages) {
+                player.sendMessage(
+                        Text.literal("Block count aborted.")
+                                .formatted(Random.chatColorToFormat(config.chatColor)),
+                        false
+                );
+            }
+
+            clickStep.set(ActivationStep.FINISHED);
+            firstPosition = null;
+            secondPosition = null;
+
         } else {
-
-            player.sendMessage(
-                    Text.literal("Block count aborted.")
-                            .formatted(Random.chatColorToFormat(config.chatColor)),
-                    false
-            );
-
             clickStep.set(ActivationStep.FINISHED);
             firstPosition = null;
             secondPosition = null;
@@ -246,20 +273,39 @@ public class BlockCounterClient implements ClientModInitializer {
 
             clickStep.set(ActivationStep.DURING);
 
+            if (config.showDirMessages) {
+                player.sendMessage(
+                        Text.literal("Right click second position...")
+                                .formatted(Random.chatColorToFormat(config.chatColor)),
+                        false
+                );
+            }
+
             return ActionResult.FAIL;
 
         } else if (clickStep.get().equals(ActivationStep.DURING)) {
-            secondPosition = new Vec3d(pos.getX(), pos.getY(), pos.getZ());
 
-            printSecond(player);
+            if (!ImGuiService.canPlaceLine.get()) {
+                secondPosition = new Vec3d(pos.getX(), pos.getY(), pos.getZ());
 
-            firstPosition = null;
-            secondPosition = null;
+                printSecond(player);
 
-            clickStep.set(ActivationStep.FINISHED);
+                firstPosition = null;
+                secondPosition = null;
 
-            return ActionResult.FAIL;
+                clickStep.set(ActivationStep.FINISHED);
 
+                return ActionResult.FAIL;
+            } else {
+                if (secondPosition == null) {
+                    secondPosition = new Vec3d(pos.getX(), pos.getY(), pos.getZ());
+                    printSecond(player);
+
+                    return ActionResult.FAIL;
+                } else {
+                    return ActionResult.PASS;
+                }
+            }
         } else {
             return ActionResult.PASS;
         }
@@ -276,9 +322,11 @@ public class BlockCounterClient implements ClientModInitializer {
                 firstPosition = blockRenderingService.getCrosshairBlockPos();
             }
 
-            player.sendMessage(Text.literal("Activate again to destroy...")
-                            .formatted(Random.chatColorToFormat(config.chatColor)),
-                    false);
+            if (config.showDirMessages) {
+                player.sendMessage(Text.literal("Activate again to destroy...")
+                                .formatted(Random.chatColorToFormat(config.chatColor)),
+                        false);
+            }
 
         } else if (shapeStep.get().equals(ActivationStep.DURING)) {
             shapeStep.set(ActivationStep.FINISHED);
@@ -286,9 +334,12 @@ public class BlockCounterClient implements ClientModInitializer {
             lookAxis = null;
         } else {
             shapeStep.set(ActivationStep.STARTED);
-            player.sendMessage(Text.literal("Activate again to place...")
-                            .formatted(Random.chatColorToFormat(config.chatColor)),
-                    false);
+
+            if (config.showDirMessages) {
+                player.sendMessage(Text.literal("Activate again to place...")
+                                .formatted(Random.chatColorToFormat(config.chatColor)),
+                        false);
+            }
         }
     }
 
@@ -297,14 +348,32 @@ public class BlockCounterClient implements ClientModInitializer {
             case Shape.LINE:
                 if (firstPosition != null) {
                     if (config.activationMethod.equals(ActivationMethod.STANDING)) {
+
+                        BlockPos lockPos = null;
+                        if (ImGuiService.canPlaceLine.get()) {
+                            if (secondPosition != null) {
+                                lockPos = BlockPos.ofFloored(secondPosition);
+                            }
+                        }
+
                         blockRenderingService.renderStandingSelection(
                                 context.matrixStack(),
                                 firstPosition,
+                                lockPos,
                                 config);
                     } else {
+
+                        BlockPos lockPos = null;
+                        if (ImGuiService.canPlaceLine.get()) {
+                            if (secondPosition != null) {
+                                lockPos = BlockPos.ofFloored(secondPosition);
+                            }
+                        }
+
                         blockRenderingService.renderClickSelection(
                                 context.matrixStack(),
                                 firstPosition,
+                                lockPos,
                                 config);
                     }
                 }

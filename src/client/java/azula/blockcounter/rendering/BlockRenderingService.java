@@ -16,7 +16,9 @@ import net.minecraft.world.RaycastContext;
 
 import java.awt.Color;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 
 public class BlockRenderingService {
@@ -24,6 +26,9 @@ public class BlockRenderingService {
     private Color renderColor;
     private Color edgeColor;
     private RenderType renderType;
+
+    private Map<String, List<Vec3d>> circlePositions = new HashMap<>();
+    private Map<Integer, List<Vec3d>> spherePositions = new HashMap<>();
 
     public void setRenderColors(BlockCounterModMenuConfig config) {
         int renderRGB = config.renderColor;
@@ -39,7 +44,7 @@ public class BlockRenderingService {
         this.renderType = config.renderType;
     }
 
-    public void renderStandingSelection(MatrixStack stack, Vec3d firstPos, BlockCounterModMenuConfig config) {
+    public void renderStandingSelection(MatrixStack stack, Vec3d firstPos, BlockPos lockPos, BlockCounterModMenuConfig config) {
 
         if (firstPos != null) {
             assert MinecraftClient.getInstance().player != null;
@@ -47,21 +52,30 @@ public class BlockRenderingService {
             Vec3d playerPos = MinecraftClient.getInstance().player.getPos();
             BlockPos blockPosFirst = BlockPos.ofFloored(firstPos);
             BlockPos blockPosPlayer = BlockPos.ofFloored(playerPos);
+            Vec3d toRender = Vec3d.of(blockPosPlayer);
 
-            Vec3d fixedFirst = new Vec3d(blockPosFirst.getX(), blockPosFirst.getY(), blockPosFirst.getZ());
-            Vec3d toRender = new Vec3d(blockPosPlayer.getX(), blockPosPlayer.getY() - 1, blockPosPlayer.getZ());
+            if (lockPos != null) {
+                blockPosPlayer = lockPos;
+                toRender = Vec3d.of(blockPosPlayer);
+            }
+
+            Vec3d fixedFirst = Vec3d.of(blockPosFirst);
 
             this.renderLine(config, stack, fixedFirst, toRender, false);
         }
     }
 
-    public void renderClickSelection(MatrixStack stack, Vec3d firstPos, BlockCounterModMenuConfig config) {
+    public void renderClickSelection(MatrixStack stack, Vec3d firstPos, BlockPos lockPos, BlockCounterModMenuConfig config) {
 
         if (firstPos != null) {
-            Vec3d crosshairBlock = this.getCrosshairBlockPos();
+            Vec3d secondPos = getCrosshairBlockPos();
 
-            if (crosshairBlock != null) {
-                this.renderLine(config, stack, firstPos, crosshairBlock, true);
+            if (lockPos != null) {
+                secondPos = Vec3d.of(lockPos);
+            }
+
+            if (secondPos != null) {
+                this.renderLine(config, stack, firstPos, secondPos, true);
             }
         }
 
@@ -236,58 +250,66 @@ public class BlockRenderingService {
 
         List<Vec3d> renderPoints = new ArrayList<>();
 
-        int rr = radius * radius;
 
-        // Random inefficient algorithm from stack overflow
-        // https://stackoverflow.com/questions/1201200/fast-algorithm-for-drawing-filled-circles
+        if (!circlePositions.containsKey(radius + ":" + height)) {
+            int rr = radius * radius;
 
-        for (int x = -radius; x <= radius; x++) {
-            for (int z = -radius; z <= radius; z++) {
-                int xx = x * x;
-                int zz = z * z;
+            // Random inefficient algorithm from stack overflow
+            // https://stackoverflow.com/questions/1201200/fast-algorithm-for-drawing-filled-circles
 
-                if (xx + zz < rr + radius) {
-                    Vec3d toAddBottom = new Vec3d(x, 0, z);
-                    if (lockAxis != null) {
-                        if (lockAxis.equals(Direction.Axis.X)) {
-                            toAddBottom = new Vec3d(0, z, x);
-                        } else if (lockAxis.equals(Direction.Axis.Z)){
-                            toAddBottom = new Vec3d(x, z, 0);
-                        }
-                    }
+            for (int x = -radius; x <= radius; x++) {
+                for (int z = -radius; z <= radius; z++) {
+                    int xx = x * x;
+                    int zz = z * z;
 
-                    renderPoints.add(centerPos.add(toAddBottom));
-
-                    if (height > 1) {
-                        Vec3d toAddTop = new Vec3d(x, height - 1, z);
+                    if (xx + zz < rr + radius) {
+                        Vec3d toAddBottom = new Vec3d(x, 0, z);
                         if (lockAxis != null) {
                             if (lockAxis.equals(Direction.Axis.X)) {
-                                toAddTop = new Vec3d(height - 1, z, x);
+                                toAddBottom = new Vec3d(0, z, x);
                             } else if (lockAxis.equals(Direction.Axis.Z)){
-                                toAddTop = new Vec3d(x, z, height - 1);
+                                toAddBottom = new Vec3d(x, z, 0);
                             }
                         }
 
-                        renderPoints.add(centerPos.add(toAddTop));
+                        renderPoints.add(toAddBottom);
 
-                        if (xx + zz > rr - radius) {
-                            for (int y = 1; y < height - 1; y++) {
-                                Vec3d toAddSides = new Vec3d(x, y, z);
-                                if (lockAxis != null) {
-                                    if (lockAxis.equals(Direction.Axis.X)) {
-                                        toAddSides = new Vec3d(y, z, x);
-                                    } else if (lockAxis.equals(Direction.Axis.Z)){
-                                        toAddSides = new Vec3d(x, z, y);
-                                    }
+                        if (height > 1) {
+                            Vec3d toAddTop = new Vec3d(x, height - 1, z);
+                            if (lockAxis != null) {
+                                if (lockAxis.equals(Direction.Axis.X)) {
+                                    toAddTop = new Vec3d(height - 1, z, x);
+                                } else if (lockAxis.equals(Direction.Axis.Z)){
+                                    toAddTop = new Vec3d(x, z, height - 1);
                                 }
-                                renderPoints.add(centerPos.add(toAddSides));
+                            }
+
+                            renderPoints.add(toAddTop);
+
+                            if (xx + zz > rr - radius) {
+                                for (int y = 1; y < height - 1; y++) {
+                                    Vec3d toAddSides = new Vec3d(x, y, z);
+                                    if (lockAxis != null) {
+                                        if (lockAxis.equals(Direction.Axis.X)) {
+                                            toAddSides = new Vec3d(y, z, x);
+                                        } else if (lockAxis.equals(Direction.Axis.Z)){
+                                            toAddSides = new Vec3d(x, z, y);
+                                        }
+                                    }
+                                    renderPoints.add(toAddSides);
+                                }
                             }
                         }
-                    }
 
+                    }
                 }
             }
+
+            circlePositions.put(radius + ":" + height, renderPoints);
+        } else {
+            renderPoints = circlePositions.get(radius + ":" + height);
         }
+
 
         this.setRenderColors(config);
         Vec3d blockDimension = new Vec3d(1, 1, 1);
@@ -295,12 +317,13 @@ public class BlockRenderingService {
         Renderer3d.stopRenderThroughWalls();
 
         for (Vec3d point : renderPoints) {
+            Vec3d toRender = centerPos.add(point);
             if (this.renderType.equals(RenderType.SOLID)) {
-                Renderer3d.renderFilled(stack, this.renderColor, point, blockDimension);
+                Renderer3d.renderFilled(stack, this.renderColor, toRender, blockDimension);
             } else if (this.renderType.equals(RenderType.EDGE_ONLY)) {
-                Renderer3d.renderOutline(stack, this.edgeColor, point, blockDimension);
+                Renderer3d.renderOutline(stack, this.edgeColor, toRender, blockDimension);
             } else {
-                Renderer3d.renderEdged(stack, this.renderColor, this.edgeColor, point, blockDimension);
+                Renderer3d.renderEdged(stack, this.renderColor, this.edgeColor, toRender, blockDimension);
             }
         }
 
@@ -334,24 +357,30 @@ public class BlockRenderingService {
 
         List<Vec3d> renderPoints = new ArrayList<>();
 
-        int rr = radius * radius;
+        if (!spherePositions.containsKey(radius)) {
+            int rr = radius * radius;
 
-        // Random inefficient algorithm from stack overflow
-        // https://stackoverflow.com/questions/1201200/fast-algorithm-for-drawing-filled-circles
+            // Random inefficient algorithm from stack overflow
+            // https://stackoverflow.com/questions/1201200/fast-algorithm-for-drawing-filled-circles
 
-        for (int x = -radius; x <= radius; x++) {
-            for (int z = -radius; z <= radius; z++) {
-                for (int y = -radius; y <= radius; y++) {
-                    int xx = x * x;
-                    int yy = y * y;
-                    int zz = z * z;
+            for (int x = -radius; x <= radius; x++) {
+                for (int z = -radius; z <= radius; z++) {
+                    for (int y = -radius; y <= radius; y++) {
+                        int xx = x * x;
+                        int yy = y * y;
+                        int zz = z * z;
 
-                    if ((xx + yy + zz < rr + radius) && (xx + yy + zz > rr - radius)) {
-                        renderPoints.add(centerPos.add(new Vec3d(x, y, z)));
+                        if ((xx + yy + zz < rr + radius) && (xx + yy + zz > rr - radius)) {
+                            renderPoints.add(new Vec3d(x, y, z));
+                        }
                     }
-                }
 
+                }
             }
+
+            spherePositions.put(radius, renderPoints);
+        } else {
+            renderPoints = spherePositions.get(radius);
         }
 
         this.setRenderColors(config);
@@ -360,12 +389,13 @@ public class BlockRenderingService {
         Renderer3d.stopRenderThroughWalls();
 
         for (Vec3d point : renderPoints) {
+            Vec3d toRender = centerPos.add(point);
             if (this.renderType.equals(RenderType.SOLID)) {
-                Renderer3d.renderFilled(stack, this.renderColor, point, blockDimension);
+                Renderer3d.renderFilled(stack, this.renderColor, toRender, blockDimension);
             } else if (this.renderType.equals(RenderType.EDGE_ONLY)) {
-                Renderer3d.renderOutline(stack, this.edgeColor, point, blockDimension);
+                Renderer3d.renderOutline(stack, this.edgeColor, toRender, blockDimension);
             } else {
-                Renderer3d.renderEdged(stack, this.renderColor, this.edgeColor, point, blockDimension);
+                Renderer3d.renderEdged(stack, this.renderColor, this.edgeColor, toRender, blockDimension);
             }
         }
 
@@ -430,10 +460,12 @@ public class BlockRenderingService {
 
         this.setRenderColors(config);
 
-        Vec3d firstPosInt = this.toIntVec(firstPos);
+        Vec3d firstPosInt = toIntVec(firstPos);
+        Vec3d secondPosInt = toIntVec(secondPos);
+        Vec3d alteredSecond = new Vec3d(secondPosInt.x, secondPosInt.y - (isClick ? 0 : 1),secondPosInt.z);
         Vec3d renderPos = new Vec3d(firstPosInt.x, firstPosInt.y - (isClick ? 0 : 1), firstPosInt.z);
 
-        Vec3d dimensions = this.findDimensions(renderPos, secondPos);
+        Vec3d dimensions = this.findDimensions(renderPos, alteredSecond);
 
         int clickOffset = isClick ? 1 : 0;
         int standOffset = isClick ? 0 : 1;
@@ -497,11 +529,11 @@ public class BlockRenderingService {
 
     private void renderDoubleLine(BlockCounterModMenuConfig config, MatrixStack stack, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
 
-        Vec3d firstPosInt = this.toIntVec(firstPos);
-        Vec3d firstStart = new Vec3d(firstPosInt.x, firstPosInt.y - (isClick ? 0 : 1), firstPosInt.z);
+        Vec3d firstPosInt = toIntVec(firstPos);
+        Vec3d firstStart = new Vec3d(firstPosInt.x, firstPosInt.y, firstPosInt.z);
 
-        Vec3d secondPosInt = this.toIntVec(secondPos);
-        Vec3d secondStart = new Vec3d(secondPosInt.x, secondPosInt.y - (isClick ? 0 : 1), secondPosInt.z);
+        Vec3d secondPosInt = toIntVec(secondPos);
+        Vec3d secondStart = new Vec3d(secondPosInt.x, secondPosInt.y, secondPosInt.z);
 
         List<Direction.Axis> largestDiffs = BlockCalculations.findTwoLargestAxisDiff(firstStart, secondStart);
 
@@ -535,11 +567,11 @@ public class BlockRenderingService {
     // 3D Line Drawing algorithm with slight tweaks
     // https://www.geeksforgeeks.org/bresenhams-algorithm-for-3-d-line-drawing/
     private void renderFreeLine(BlockCounterModMenuConfig config, MatrixStack stack, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
-        Vec3d firstPosInt = this.toIntVec(firstPos);
-        Vec3d secondPosInt = this.toIntVec(secondPos);
+        Vec3d firstPosInt = toIntVec(firstPos);
+        Vec3d secondPosInt = toIntVec(secondPos);
 
         Vec3d startPos = new Vec3d(firstPosInt.x, firstPosInt.y - (isClick ? 0 : 1), firstPosInt.z);
-        Vec3d endPos = new Vec3d(secondPosInt.x, secondPosInt.y, secondPosInt.z);
+        Vec3d endPos = new Vec3d(secondPosInt.x, secondPosInt.y - (isClick ? 0 : 1), secondPosInt.z);
 
         int x = (int) startPos.x;
         int y = (int) startPos.y;

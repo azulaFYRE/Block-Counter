@@ -26,6 +26,7 @@ public class ImGuiService {
 
     public static ImInt selectedShape = new ImInt(0);
 
+    public static ImBoolean canPlaceLine = new ImBoolean(false);
     public static ImBoolean axisAligned = new ImBoolean(true);
     public static ImBoolean twoAxis = new ImBoolean(false);
     public static ImBoolean isSphere = new ImBoolean(false);
@@ -211,6 +212,7 @@ public class ImGuiService {
 
                     // Line Config
                     if(selected.equals(Shape.LINE)) {
+                        ImGui.checkbox("Placeable", canPlaceLine);
                         ImGui.checkbox("Axis-aligned", axisAligned);
 
                         if (axisAligned.get()) {
