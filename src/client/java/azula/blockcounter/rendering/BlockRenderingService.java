@@ -218,7 +218,7 @@ public class BlockRenderingService {
         if (!ImGuiService.isSphere.get()) {
             this.render2DCircle(stack, lockPos, lockAxis, config);
         } else {
-            this.renderSphere(stack, lockPos, lockAxis, config);
+            this.renderSphere(stack, lockPos, config);
         }
     }
 
@@ -330,7 +330,7 @@ public class BlockRenderingService {
         Renderer3d.renderThroughWalls();
     }
 
-    private void renderSphere(MatrixStack stack, BlockPos lockPos, Direction.Axis lockAxis, BlockCounterModMenuConfig config) {
+    private void renderSphere(MatrixStack stack, BlockPos lockPos, BlockCounterModMenuConfig config) {
         Vec3d offset = new Vec3d(ImGuiService.xOffset[0], ImGuiService.yOffset[0], ImGuiService.zOffset[0]);
 
         BlockPos centerBlockPos;
