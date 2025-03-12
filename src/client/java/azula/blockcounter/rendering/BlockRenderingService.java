@@ -1,8 +1,10 @@
 package azula.blockcounter.rendering;
 
 import azula.blockcounter.ActivationMethod;
+import azula.blockcounter.BlockCounterClient;
 import azula.blockcounter.config.BlockCounterModMenuConfig;
 import azula.blockcounter.config.RenderType;
+import azula.blockcounter.config.shape.ShapeConfigService;
 import azula.blockcounter.util.BlockCalculations;
 import me.x150.renderer.render.Renderer3d;
 import net.minecraft.client.MinecraftClient;
@@ -14,7 +16,7 @@ import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.RaycastContext;
 
-import java.awt.Color;
+import java.awt.*;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -83,7 +85,9 @@ public class BlockRenderingService {
 
     public void renderQuad(MatrixStack stack, BlockPos lockPos, BlockCounterModMenuConfig config) {
 
-        Vec3d offset = new Vec3d(ImGuiService.xOffset[0], ImGuiService.yOffset[0], ImGuiService.zOffset[0]);
+        ShapeConfigService shapeService = BlockCounterClient.getInstance().getShapeConfigService();
+
+        Vec3d offset = new Vec3d(shapeService.getXOffset(), shapeService.getYOffset(), shapeService.getZOffset());
 
         BlockPos renderBlockPos;
         if (lockPos == null) {
@@ -102,9 +106,9 @@ public class BlockRenderingService {
             renderBlockPos = lockPos;
         }
 
-        int length = ImGuiService.length[0];
-        int width = ImGuiService.width[0];
-        int height = ImGuiService.height[0];
+        int length = shapeService.getQLength();
+        int width = shapeService.getQWidth();
+        int height = shapeService.getQHeight();
 
         Vec3d dimensions = new Vec3d(length, height, width);
 
@@ -156,7 +160,8 @@ public class BlockRenderingService {
                         if (height > 1) Renderer3d.renderOutline(stack, this.edgeColor, topY, blockDimension);
                     } else {
                         Renderer3d.renderEdged(stack, this.renderColor, this.edgeColor, bottomY, blockDimension);
-                        if (height > 1) Renderer3d.renderEdged(stack, this.renderColor, this.edgeColor, topY, blockDimension);
+                        if (height > 1)
+                            Renderer3d.renderEdged(stack, this.renderColor, this.edgeColor, topY, blockDimension);
                     }
 
                     bottomY = bottomY.add(toAddX);
@@ -176,7 +181,8 @@ public class BlockRenderingService {
                         if (length > 1) Renderer3d.renderOutline(stack, this.edgeColor, backX, blockDimension);
                     } else {
                         Renderer3d.renderEdged(stack, this.renderColor, this.edgeColor, frontX, blockDimension);
-                        if (length > 1) Renderer3d.renderEdged(stack, this.renderColor, this.edgeColor, backX, blockDimension);
+                        if (length > 1)
+                            Renderer3d.renderEdged(stack, this.renderColor, this.edgeColor, backX, blockDimension);
                     }
 
                     frontX = frontX.add(toAddZ);
@@ -197,7 +203,8 @@ public class BlockRenderingService {
                         if (width > 1) Renderer3d.renderOutline(stack, this.edgeColor, rightZ, blockDimension);
                     } else {
                         Renderer3d.renderEdged(stack, this.renderColor, this.edgeColor, leftZ, blockDimension);
-                        if (width > 1) Renderer3d.renderEdged(stack, this.renderColor, this.edgeColor, rightZ, blockDimension);
+                        if (width > 1)
+                            Renderer3d.renderEdged(stack, this.renderColor, this.edgeColor, rightZ, blockDimension);
                     }
 
                     leftZ = leftZ.add(toAddX);
@@ -215,7 +222,7 @@ public class BlockRenderingService {
     }
 
     public void renderCircle(MatrixStack stack, BlockPos lockPos, Direction.Axis lockAxis, BlockCounterModMenuConfig config) {
-        if (!ImGuiService.isSphere.get()) {
+        if (!BlockCounterClient.getInstance().getShapeConfigService().isSphere()) {
             this.render2DCircle(stack, lockPos, lockAxis, config);
         } else {
             this.renderSphere(stack, lockPos, config);
@@ -223,7 +230,9 @@ public class BlockRenderingService {
     }
 
     private void render2DCircle(MatrixStack stack, BlockPos lockPos, Direction.Axis lockAxis, BlockCounterModMenuConfig config) {
-        Vec3d offset = new Vec3d(ImGuiService.xOffset[0], ImGuiService.yOffset[0], ImGuiService.zOffset[0]);
+        ShapeConfigService shapeService = BlockCounterClient.getInstance().getShapeConfigService();
+
+        Vec3d offset = new Vec3d(shapeService.getXOffset(), shapeService.getYOffset(), shapeService.getZOffset());
 
         BlockPos centerBlockPos;
 
@@ -245,13 +254,13 @@ public class BlockRenderingService {
         Vec3d centerPos = Vec3d.of(centerBlockPos);
         centerPos = centerPos.add(offset);
 
-        int radius = ImGuiService.radius[0];
-        int height = ImGuiService.circleHeight[0];
+        int radius = shapeService.getCRadius();
+        int height = shapeService.getCHeight();
 
         List<Vec3d> renderPoints = new ArrayList<>();
 
 
-        if (!circlePositions.containsKey(radius + ":" + height)) {
+        if (!circlePositions.containsKey(radius + ":" + height + ":" + lockAxis)) {
             int rr = radius * radius;
 
             // Random inefficient algorithm from stack overflow
@@ -267,7 +276,7 @@ public class BlockRenderingService {
                         if (lockAxis != null) {
                             if (lockAxis.equals(Direction.Axis.X)) {
                                 toAddBottom = new Vec3d(0, z, x);
-                            } else if (lockAxis.equals(Direction.Axis.Z)){
+                            } else if (lockAxis.equals(Direction.Axis.Z)) {
                                 toAddBottom = new Vec3d(x, z, 0);
                             }
                         }
@@ -279,7 +288,7 @@ public class BlockRenderingService {
                             if (lockAxis != null) {
                                 if (lockAxis.equals(Direction.Axis.X)) {
                                     toAddTop = new Vec3d(height - 1, z, x);
-                                } else if (lockAxis.equals(Direction.Axis.Z)){
+                                } else if (lockAxis.equals(Direction.Axis.Z)) {
                                     toAddTop = new Vec3d(x, z, height - 1);
                                 }
                             }
@@ -292,7 +301,7 @@ public class BlockRenderingService {
                                     if (lockAxis != null) {
                                         if (lockAxis.equals(Direction.Axis.X)) {
                                             toAddSides = new Vec3d(y, z, x);
-                                        } else if (lockAxis.equals(Direction.Axis.Z)){
+                                        } else if (lockAxis.equals(Direction.Axis.Z)) {
                                             toAddSides = new Vec3d(x, z, y);
                                         }
                                     }
@@ -305,11 +314,10 @@ public class BlockRenderingService {
                 }
             }
 
-            circlePositions.put(radius + ":" + height, renderPoints);
+            circlePositions.put(radius + ":" + height + ":" + lockAxis, renderPoints);
         } else {
-            renderPoints = circlePositions.get(radius + ":" + height);
+            renderPoints = circlePositions.get(radius + ":" + height + ":" + lockAxis);
         }
-
 
         this.setRenderColors(config);
         Vec3d blockDimension = new Vec3d(1, 1, 1);
@@ -331,7 +339,9 @@ public class BlockRenderingService {
     }
 
     private void renderSphere(MatrixStack stack, BlockPos lockPos, BlockCounterModMenuConfig config) {
-        Vec3d offset = new Vec3d(ImGuiService.xOffset[0], ImGuiService.yOffset[0], ImGuiService.zOffset[0]);
+        ShapeConfigService shapeService = BlockCounterClient.getInstance().getShapeConfigService();
+
+        Vec3d offset = new Vec3d(shapeService.getXOffset(), shapeService.getYOffset(), shapeService.getZOffset());
 
         BlockPos centerBlockPos;
 
@@ -353,7 +363,7 @@ public class BlockRenderingService {
         Vec3d centerPos = Vec3d.of(centerBlockPos);
         centerPos = centerPos.add(offset);
 
-        int radius = ImGuiService.radius[0];
+        int radius = shapeService.getCRadius();
 
         List<Vec3d> renderPoints = new ArrayList<>();
 
@@ -442,9 +452,11 @@ public class BlockRenderingService {
 
     private void renderLine(BlockCounterModMenuConfig config, MatrixStack stack, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
 
-        if (ImGuiService.axisAligned.get()) {
+        ShapeConfigService shapeService = BlockCounterClient.getInstance().getShapeConfigService();
 
-            if (!ImGuiService.twoAxis.get()) {
+        if (shapeService.isAxisAligned()) {
+
+            if (!shapeService.isTwoAxis()) {
                 this.renderSingleLine(config, stack, firstPos, secondPos, isClick);
             } else {
                 this.renderDoubleLine(config, stack, firstPos, secondPos, isClick);
@@ -462,7 +474,7 @@ public class BlockRenderingService {
 
         Vec3d firstPosInt = toIntVec(firstPos);
         Vec3d secondPosInt = toIntVec(secondPos);
-        Vec3d alteredSecond = new Vec3d(secondPosInt.x, secondPosInt.y - (isClick ? 0 : 1),secondPosInt.z);
+        Vec3d alteredSecond = new Vec3d(secondPosInt.x, secondPosInt.y - (isClick ? 0 : 1), secondPosInt.z);
         Vec3d renderPos = new Vec3d(firstPosInt.x, firstPosInt.y - (isClick ? 0 : 1), firstPosInt.z);
 
         Vec3d dimensions = this.findDimensions(renderPos, alteredSecond);
@@ -500,7 +512,7 @@ public class BlockRenderingService {
 
         Direction.Axis dir = BlockCalculations.findLargestAxisDiff(dimensions);
 
-        Vec3d blockDimension = new Vec3d(1, 1,1);
+        Vec3d blockDimension = new Vec3d(1, 1, 1);
         int stopIndex = (int) (dir.equals(Direction.Axis.X) ? dimensions.x :
                 (dir.equals(Direction.Axis.Y) ? dimensions.y : dimensions.z));
         Vec3d toAdd = (dir.equals(Direction.Axis.X) ? new Vec3d(1, 0, 0) :

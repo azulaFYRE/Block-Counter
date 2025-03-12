@@ -2,24 +2,19 @@ package azula.blockcounter;
 
 import azula.blockcounter.config.BlockCounterModMenuConfig;
 import azula.blockcounter.config.MessageDisplay;
-import azula.blockcounter.event.LockCursorCallback;
+import azula.blockcounter.config.shape.ShapeConfigScreen;
+import azula.blockcounter.config.shape.ShapeConfigService;
 import azula.blockcounter.rendering.BlockRenderingService;
-import azula.blockcounter.rendering.ImGuiService;
 import azula.blockcounter.util.BlockCalculations;
 import azula.blockcounter.util.Random;
-import imgui.ImGui;
-import imgui.flag.ImGuiCond;
-import imgui.type.ImBoolean;
 import me.shedaniel.autoconfig.AutoConfig;
 import me.shedaniel.autoconfig.ConfigHolder;
 import me.shedaniel.autoconfig.serializer.Toml4jConfigSerializer;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
-import net.fabricmc.fabric.api.event.client.player.ClientPreAttackCallback;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
@@ -33,7 +28,6 @@ import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class BlockCounterClient implements ClientModInitializer {
@@ -41,6 +35,7 @@ public class BlockCounterClient implements ClientModInitializer {
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
     private final BlockRenderingService blockRenderingService = new BlockRenderingService();
+    private final ShapeConfigService shapeConfigService = new ShapeConfigService();
 
     public static KeyBinding activationKey;
     public static KeyBinding configMenuKey;
@@ -55,8 +50,6 @@ public class BlockCounterClient implements ClientModInitializer {
     private Vec3d secondPosition;
 
     private Direction.Axis lookAxis = null;
-
-    private ImBoolean menuOpen = new ImBoolean(false);
 
     private static BlockCounterClient instance;
 
@@ -90,38 +83,19 @@ public class BlockCounterClient implements ClientModInitializer {
         clickStep.set(ActivationStep.FINISHED);
         shapeStep.set(ActivationStep.FINISHED);
 
-        // Stop all player movement when menu open
-        ClientTickEvents.START_CLIENT_TICK.register(client -> {
-            if (menuOpen.get()) Random.lockMovement();
-        });
-
-        // Stop mouse click when menu is open
-        ClientPreAttackCallback.EVENT.register((client, player, tick) -> menuOpen.get());
-
-        // Keep the mouse unlocked when left-clicking while the menu is open
-        LockCursorCallback.EVENT.register(() -> menuOpen.get() ? ActionResult.FAIL : ActionResult.PASS);
-
         // Handle Standing Activation Method
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
 
             // Check for menu key
             while (configMenuKey.wasPressed()) {
-                menuOpen.set(!menuOpen.get());
-
-                if (menuOpen.get()) {
-                    client.mouse.unlockCursor();
-                } else {
-                    client.mouse.lockCursor();
-                }
+                client.setScreen(new ShapeConfigScreen(this.shapeConfigService, client.currentScreen));
             }
 
             // Check for activation key
             while (activationKey.wasPressed()) {
                 assert client.player != null;
 
-                menuOpen.set(false);
-
-                Shape selected = Shape.parseInt(ImGuiService.selectedShape.get());
+                Shape selected = this.shapeConfigService.getSelectedShape();
                 if (selected == null) return;
 
                 handleShapeSelection(selected, client);
@@ -131,7 +105,7 @@ public class BlockCounterClient implements ClientModInitializer {
         // Handle Click Activation Method
         UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
 
-            Shape selected = Shape.parseInt(ImGuiService.selectedShape.get());
+            Shape selected = this.shapeConfigService.getSelectedShape();
             if (selected == null) return ActionResult.PASS;
 
             if (selected.equals(Shape.LINE)) {
@@ -148,27 +122,10 @@ public class BlockCounterClient implements ClientModInitializer {
         // Block rendering
         WorldRenderEvents.LAST.register(context -> {
 
-            Shape selected = Shape.parseInt(ImGuiService.selectedShape.get());
+            Shape selected = this.shapeConfigService.getSelectedShape();
             if (selected == null) return;
 
             handleRender(selected, context);
-        });
-
-        // ImGui Menu
-        HudRenderCallback.EVENT.register((context, tick) -> {
-            if (menuOpen.get()) {
-                ImGuiService.draw(io -> {
-
-                    ImGui.setNextWindowPos(0, 0, ImGuiCond.Once);
-
-                    try {
-                        ImGuiService.renderMenu();
-                    } catch (IOException e) {
-                        throw new RuntimeException("Block-Counter ImGui menu operation failed: \n" + e.getMessage());
-                    }
-
-                });
-            }
         });
 
         instance = this;
@@ -210,7 +167,7 @@ public class BlockCounterClient implements ClientModInitializer {
 
             printSecond(player);
 
-            if (!ImGuiService.canPlaceLine.get()) {
+            if (!this.shapeConfigService.canPlaceLine()) {
                 firstPosition = null;
                 secondPosition = null;
 
@@ -286,7 +243,7 @@ public class BlockCounterClient implements ClientModInitializer {
 
         } else if (clickStep.get().equals(ActivationStep.DURING)) {
 
-            if (!ImGuiService.canPlaceLine.get()) {
+            if (!this.shapeConfigService.canPlaceLine()) {
                 secondPosition = new Vec3d(pos.getX(), pos.getY(), pos.getZ());
 
                 printSecond(player);
@@ -351,7 +308,7 @@ public class BlockCounterClient implements ClientModInitializer {
                     if (config.activationMethod.equals(ActivationMethod.STANDING)) {
 
                         BlockPos lockPos = null;
-                        if (ImGuiService.canPlaceLine.get()) {
+                        if (this.shapeConfigService.canPlaceLine()) {
                             if (secondPosition != null) {
                                 lockPos = BlockPos.ofFloored(secondPosition);
                             }
@@ -365,7 +322,7 @@ public class BlockCounterClient implements ClientModInitializer {
                     } else {
 
                         BlockPos lockPos = null;
-                        if (ImGuiService.canPlaceLine.get()) {
+                        if (this.shapeConfigService.canPlaceLine()) {
                             if (secondPosition != null) {
                                 lockPos = BlockPos.ofFloored(secondPosition);
                             }
@@ -444,8 +401,8 @@ public class BlockCounterClient implements ClientModInitializer {
         }
 
         int dist;
-        if (ImGuiService.axisAligned.get()) {
-            if (!ImGuiService.twoAxis.get()) {
+        if (this.shapeConfigService.isAxisAligned()) {
+            if (!this.shapeConfigService.isTwoAxis()) {
                 dist = BlockCalculations.calculateBlocksOne(firstPosition, secondPosition, isClick);
             } else {
                 dist = BlockCalculations.calculateBlocksTwo(firstPosition, secondPosition, isClick);
@@ -470,6 +427,10 @@ public class BlockCounterClient implements ClientModInitializer {
 
     public static BlockCounterClient getInstance() {
         return instance;
+    }
+
+    public ShapeConfigService getShapeConfigService() {
+        return this.shapeConfigService;
     }
 
     public void shapeChanged() {

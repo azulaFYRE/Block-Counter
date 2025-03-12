@@ -1,7 +1,8 @@
 package azula.blockcounter.util;
 
+import azula.blockcounter.BlockCounterClient;
+import azula.blockcounter.config.shape.ShapeConfigService;
 import azula.blockcounter.rendering.BlockRenderingService;
-import azula.blockcounter.rendering.ImGuiService;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
 
@@ -162,23 +163,26 @@ public class BlockCalculations {
     }
 
     public static int calculateBlocksQuad() {
-        int w = ImGuiService.width[0];
-        int l = ImGuiService.length[0];
-        int h = ImGuiService.height[0];
+        ShapeConfigService shapeService = BlockCounterClient.getInstance().getShapeConfigService();
+
+        int w = shapeService.getQWidth();
+        int l = shapeService.getQLength();
+        int h = shapeService.getQHeight();
 
         int totalBlocks = w * l * h;
 
-        if (ImGuiService.calcUsingRendered.get()) {
+        if (shapeService.isCalcUsingRendered()) {
             totalBlocks -= ((w - 2) * (l - 2) * (h - 2));
         }
-
 
         return totalBlocks;
     }
 
     public static int calculateBlocksCircle() {
-        int radius = ImGuiService.radius[0];
-        int height = ImGuiService.circleHeight[0];
+        ShapeConfigService shapeService = BlockCounterClient.getInstance().getShapeConfigService();
+
+        int radius = shapeService.getCRadius();
+        int height = shapeService.getCHeight();
 
         int totalPoints = 0;
 
@@ -195,7 +199,7 @@ public class BlockCalculations {
                     // for the bottom
                     totalPoints++;
 
-                    if (ImGuiService.calcUsingRendered.get()) {
+                    if (shapeService.isCalcUsingRendered()) {
                         if (height > 1) {
                             // for the top
                             totalPoints++;
@@ -210,7 +214,7 @@ public class BlockCalculations {
             }
         }
 
-        if (!ImGuiService.calcUsingRendered.get()) {
+        if (!shapeService.isCalcUsingRendered()) {
             if (height > 1) {
                 totalPoints *= height;
             }
@@ -220,7 +224,9 @@ public class BlockCalculations {
     }
 
     public static int calculateBlocksSphere() {
-        int radius = ImGuiService.radius[0];
+        ShapeConfigService shapeService = BlockCounterClient.getInstance().getShapeConfigService();
+
+        int radius = shapeService.getCRadius();
 
         int totalPoints = 0;
         int rr = radius * radius;
@@ -234,7 +240,7 @@ public class BlockCalculations {
 
                     boolean inside = xx + yy + zz < rr + radius;
 
-                    if (ImGuiService.calcUsingRendered.get()) {
+                    if (shapeService.isCalcUsingRendered()) {
                         if (inside && (xx + yy + zz > rr - radius)) {
                             totalPoints++;
                         }
