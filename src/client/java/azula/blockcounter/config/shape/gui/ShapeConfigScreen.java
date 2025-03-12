@@ -1,7 +1,8 @@
-package azula.blockcounter.config.shape;
+package azula.blockcounter.config.shape.gui;
 
 import azula.blockcounter.BlockCounterClient;
 import azula.blockcounter.Shape;
+import azula.blockcounter.config.shape.ShapeConfigService;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -74,6 +75,8 @@ public class ShapeConfigScreen extends Screen {
 
         int buttonWidth = configWidth - 20;
         int buttonHeight = 20;
+
+        // Shape Selector
         ButtonWidget shape = ButtonWidget.builder(
                         Text.of(this.configService.getSelectedShape().toString()),
                         (button) -> this.cycleShape())
@@ -84,6 +87,7 @@ public class ShapeConfigScreen extends Screen {
                         buttonHeight)
                 .build();
 
+        // Line options
         CheckboxWidget placeable = CheckboxWidget.builder(Text.of("Placeable"), this.textRenderer)
                 .pos(
                         (this.width - this.configWidth) / 2 + padding,
@@ -108,6 +112,8 @@ public class ShapeConfigScreen extends Screen {
                 .checked(this.configService.isTwoAxis())
                 .build();
 
+
+        // Quad options
         Slider qLength = new Slider(
                 (this.width - this.configWidth) / 2 + padding,
                 yStart + 2 * (ySpacing + padding / 2) + textRenderer.fontHeight + 5,
@@ -144,6 +150,8 @@ public class ShapeConfigScreen extends Screen {
                 (sldr, v) -> this.configService.setQHeight(v)
         );
 
+
+        // Circle options
         Slider cRadius = new Slider(
                 (this.width - this.configWidth) / 2 + padding,
                 yStart + 2 * (ySpacing + padding / 2) + textRenderer.fontHeight + 5,
@@ -176,6 +184,8 @@ public class ShapeConfigScreen extends Screen {
                 (sldr, v) -> this.configService.setCHeight(v)
         );
 
+
+        // Quad and circle options
         Slider offsetX = new Slider(
                 (this.width - this.configWidth) / 2 + padding,
                 yStart + 7 * (ySpacing + padding / 2) + 10,
@@ -274,6 +284,7 @@ public class ShapeConfigScreen extends Screen {
 
         boolean isLine = this.configService.getSelectedShape().equals(Shape.LINE);
 
+        // Visibility based on selected shape
         this.lineButtons.forEach(b -> b.visible = this.configService.getSelectedShape().equals(Shape.LINE));
         this.quadButtons.forEach(b -> b.visible = this.configService.getSelectedShape().equals(Shape.QUAD));
         this.circleButtons.forEach(b -> b.visible = this.configService.getSelectedShape().equals(Shape.CIRCLE));

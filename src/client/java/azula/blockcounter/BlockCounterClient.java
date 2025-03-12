@@ -2,7 +2,7 @@ package azula.blockcounter;
 
 import azula.blockcounter.config.BlockCounterModMenuConfig;
 import azula.blockcounter.config.MessageDisplay;
-import azula.blockcounter.config.shape.ShapeConfigScreen;
+import azula.blockcounter.config.shape.gui.ShapeConfigScreen;
 import azula.blockcounter.config.shape.ShapeConfigService;
 import azula.blockcounter.rendering.BlockRenderingService;
 import azula.blockcounter.util.BlockCalculations;

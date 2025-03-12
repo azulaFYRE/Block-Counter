@@ -1,4 +1,4 @@
-package azula.blockcounter.config.shape;
+package azula.blockcounter.config.shape.gui;
 
 import net.minecraft.client.gui.widget.SliderWidget;
 import net.minecraft.text.Text;
