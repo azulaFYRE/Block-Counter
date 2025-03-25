@@ -136,14 +136,14 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
 
         this.setRenderColors(config);
 
-        Vec3d firstPosInt = Random.toIntVec(firstPos);
-        Vec3d secondPosInt = Random.toIntVec(secondPos);
-
         LineConfigService service = BlockCounterClient.getInstance().getLineConfigService();
         Vec3d offset = new Vec3d(service.getXOffset(), service.getYOffset(), service.getZOffset());
 
-        Vec3d alteredSecond = new Vec3d(secondPosInt.x, secondPosInt.y - (isClick ? 0 : 1), secondPosInt.z).add(offset);
-        Vec3d renderPos = new Vec3d(firstPosInt.x, firstPosInt.y - (isClick ? 0 : 1), firstPosInt.z).add(offset);
+        Vec3d firstPosInt = Random.toIntVec(firstPos).add(offset);
+        Vec3d secondPosInt = Random.toIntVec(secondPos).add(offset);
+
+        Vec3d alteredSecond = new Vec3d(secondPosInt.x, secondPosInt.y - (isClick ? 0 : 1), secondPosInt.z);
+        Vec3d renderPos = new Vec3d(firstPosInt.x, firstPosInt.y - (isClick ? 0 : 1), firstPosInt.z);
 
         Vec3d dimensions = this.findDimensions(renderPos, alteredSecond);
 
@@ -247,14 +247,14 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
     // 3D Line Drawing algorithm with slight tweaks
     // https://www.geeksforgeeks.org/bresenhams-algorithm-for-3-d-line-drawing/
     private void renderFreeLine(BlockCounterModMenuConfig config, MatrixStack stack, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
-        Vec3d firstPosInt = Random.toIntVec(firstPos);
-        Vec3d secondPosInt = Random.toIntVec(secondPos);
-
         LineConfigService service = BlockCounterClient.getInstance().getLineConfigService();
         Vec3d offset = new Vec3d(service.getXOffset(), service.getYOffset(), service.getZOffset());
 
-        Vec3d startPos = new Vec3d(firstPosInt.x, firstPosInt.y - (isClick ? 0 : 1), firstPosInt.z).add(offset);
-        Vec3d endPos = new Vec3d(secondPosInt.x, secondPosInt.y - (isClick ? 0 : 1), secondPosInt.z).add(offset);
+        Vec3d firstPosInt = Random.toIntVec(firstPos).add(offset);
+        Vec3d secondPosInt = Random.toIntVec(secondPos).add(offset);
+
+        Vec3d startPos = new Vec3d(firstPosInt.x, firstPosInt.y - (isClick ? 0 : 1), firstPosInt.z);
+        Vec3d endPos = new Vec3d(secondPosInt.x, secondPosInt.y - (isClick ? 0 : 1), secondPosInt.z);
 
         int x = (int) startPos.x;
         int y = (int) startPos.y;

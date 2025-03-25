@@ -18,13 +18,16 @@ import org.lwjgl.glfw.GLFW;
 @Environment(EnvType.CLIENT)
 public class LineConfigScreen extends Screen {
 
-    private LineConfigService configService;
+    private final Identifier BACKGROUND_TEXTURE = Identifier.of(BlockCounterClient.MOD_ID, "textures/gui/line_config_background.png");
+
+    private final LineConfigService configService;
     protected final Screen parent;
 
     private final int padding = 10;
+    private final int ySpacing = 20;
 
-    private final int configWidth = 176;
-    private final int configHeight = 294;
+    private final int configWidth = 104;
+    private final int configHeight = 169;
 
     private int yStart;
 
@@ -46,8 +49,8 @@ public class LineConfigScreen extends Screen {
 
         yStart = (this.height - this.configHeight) / 2 + padding;
 
-        int buttonWidth = configWidth * 2;
-        int buttonHeight = padding * 2;
+        int buttonWidth = configWidth - 2 * padding;
+        int buttonHeight = 2 * padding;
 
         // Line options
         CheckboxWidget placeable = CheckboxWidget.builder(Text.of("Placeable"), this.textRenderer)
@@ -61,7 +64,7 @@ public class LineConfigScreen extends Screen {
         CheckboxWidget axisAligned = CheckboxWidget.builder(Text.of("Axis-Aligned"), this.textRenderer)
                 .pos(
                         (this.width - this.configWidth) / 2 + padding,
-                        yStart + 2 * padding)
+                        yStart + ySpacing)
                 .callback((btn, b) -> this.configService.setAxisAligned(b))
                 .checked(this.configService.isAxisAligned())
                 .build();
@@ -69,7 +72,7 @@ public class LineConfigScreen extends Screen {
         CheckboxWidget twoAxis = CheckboxWidget.builder(Text.of("Dual-Axis"), this.textRenderer)
                 .pos(
                         (this.width - this.configWidth) / 2 + padding,
-                        yStart + 3 * padding)
+                        yStart + 2 * ySpacing)
                 .callback((btn, b) -> this.configService.setTwoAxis(b))
                 .checked(this.configService.isTwoAxis())
                 .build();
@@ -78,7 +81,7 @@ public class LineConfigScreen extends Screen {
         // Offset sliders
         Slider offsetX = new Slider(
                 (this.width - this.configWidth) / 2 + padding,
-                yStart + 5 * padding,
+                yStart + 4 * ySpacing + 2,
                 buttonWidth,
                 buttonHeight,
                 Text.of("X: 0"),
@@ -90,7 +93,7 @@ public class LineConfigScreen extends Screen {
 
         Slider offsetY = new Slider(
                 (this.width - this.configWidth) / 2 + padding,
-                yStart + 6 * padding,
+                yStart + 5 * ySpacing + 2,
                 buttonWidth,
                 buttonHeight,
                 Text.of("Y: 0"),
@@ -102,7 +105,7 @@ public class LineConfigScreen extends Screen {
 
         Slider offsetZ = new Slider(
                 (this.width - this.configWidth) / 2 + padding,
-                yStart + 7 * padding,
+                yStart + 6 * ySpacing + 2,
                 buttonWidth,
                 buttonHeight,
                 Text.of("Z: 0"),
@@ -131,6 +134,8 @@ public class LineConfigScreen extends Screen {
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
 
+        this.renderBackground(context, BACKGROUND_TEXTURE);
+
         this.twoAxisWidget.visible = this.configService.isAxisAligned();
 
         boolean canPlace = this.configService.canPlaceLine();
@@ -155,7 +160,7 @@ public class LineConfigScreen extends Screen {
         if (canPlace) {
             context.drawText(this.textRenderer, "Offset",
                     (this.width - this.configWidth) / 2 + padding,
-                    yStart + 4 * padding,
+                    yStart + 3 * ySpacing + textRenderer.fontHeight,
                     0xFFFFFFFF,
                     true
             );
@@ -185,7 +190,7 @@ public class LineConfigScreen extends Screen {
 
         matrices.push();
         context.drawTexture(RenderLayer::getGuiTextured, background, (width - configWidth) / 2, (height - configHeight) / 2,
-                0, 0, configWidth, configHeight, 256, 512);
+                0, 0, configWidth, configHeight, 256, 256);
         matrices.pop();
 
         RenderSystem.disableBlend();
