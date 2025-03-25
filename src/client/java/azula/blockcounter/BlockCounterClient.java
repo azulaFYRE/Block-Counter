@@ -1,7 +1,12 @@
 package azula.blockcounter;
 
 import azula.blockcounter.config.BlockCounterModMenuConfig;
+import azula.blockcounter.config.MessageDisplay;
+import azula.blockcounter.config.shape.LineConfigService;
+import azula.blockcounter.config.shape.LineConfigServiceImpl;
+import azula.blockcounter.config.shape.gui.LineConfigScreen;
 import azula.blockcounter.rendering.BlockRenderingService;
+import azula.blockcounter.rendering.BlockRenderingServiceImpl;
 import azula.blockcounter.util.BlockCalculations;
 import azula.blockcounter.util.Random;
 import me.shedaniel.autoconfig.AutoConfig;
@@ -28,9 +33,13 @@ public class BlockCounterClient implements ClientModInitializer {
     public static final String MOD_ID = "block-counter";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
-    private final BlockRenderingService blockRenderingService = new BlockRenderingService();
+    private static BlockCounterClient INSTANCE;
+
+    private final BlockRenderingService blockRenderingService = new BlockRenderingServiceImpl();
+    private final LineConfigService lineConfigService = new LineConfigServiceImpl();
 
     public static KeyBinding activationKey;
+    public static KeyBinding configMenuKey;
 
     private final AtomicReference<ActivationStep> standStep = new AtomicReference<>();
     private final AtomicReference<ActivationStep> clickStep = new AtomicReference<>();
@@ -45,6 +54,8 @@ public class BlockCounterClient implements ClientModInitializer {
         ConfigHolder<BlockCounterModMenuConfig> configHolder = AutoConfig
                 .register(BlockCounterModMenuConfig.class, Toml4jConfigSerializer::new);
 
+        INSTANCE = this;
+
         // Load config
         this.config = configHolder.getConfig();
 
@@ -58,12 +69,25 @@ public class BlockCounterClient implements ClientModInitializer {
                 "text.category.blockcounter"
         ));
 
+        // Grab config menu keyBinding
+        configMenuKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "text.autoconfig.blockcounter.option.configMenuKey",
+                GLFW.GLFW_KEY_DELETE,
+                "text.category.blockcounter"
+        ));
+
         // Handle activation key press
         standStep.set(ActivationStep.FINISHED);
         clickStep.set(ActivationStep.FINISHED);
 
         // Handle Standing Activation Method
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
+
+            // Check for menu key
+            while (configMenuKey.wasPressed()) {
+                client.setScreen(new LineConfigScreen(this.lineConfigService, client.currentScreen));
+            }
+
             while (activationKey.wasPressed()) {
                 assert client.player != null;
 
@@ -87,15 +111,26 @@ public class BlockCounterClient implements ClientModInitializer {
         // Block rendering
         WorldRenderEvents.LAST.register(context -> {
             if (firstPosition != null) {
+
+                BlockPos lockPos = null;
+
+                if (this.lineConfigService.canPlaceLine()) {
+                    if (secondPosition != null) {
+                        lockPos = BlockPos.ofFloored(secondPosition);
+                    }
+                }
+
                 if (config.activationMethod.equals(ActivationMethod.STANDING)) {
                     blockRenderingService.renderStandingSelection(
                             context.matrixStack(),
                             firstPosition,
+                            lockPos,
                             config);
                 } else {
                     blockRenderingService.renderClickSelection(
                             context.matrixStack(),
                             firstPosition,
+                            lockPos,
                             config);
                 }
             }
@@ -106,7 +141,7 @@ public class BlockCounterClient implements ClientModInitializer {
         if (standStep.get().equals(ActivationStep.FINISHED)) {
 
             BlockPos firstPos = BlockPos.ofFloored(player.getPos());
-            firstPosition = new Vec3d(firstPos.getX(), firstPos.getY(), firstPos.getZ());
+            firstPosition = Vec3d.of(firstPos);
             printFirst(player);
 
             standStep.set(ActivationStep.STARTED);
@@ -114,10 +149,19 @@ public class BlockCounterClient implements ClientModInitializer {
         } else if (standStep.get().equals(ActivationStep.STARTED)) {
 
             BlockPos secondPos = BlockPos.ofFloored(player.getPos());
-            secondPosition = new Vec3d(secondPos.getX(), secondPos.getY(), secondPos.getZ());
+            secondPosition = Vec3d.of(secondPos);
 
             printSecond(player);
 
+            if (!this.lineConfigService.canPlaceLine()) {
+                firstPosition = null;
+                secondPosition = null;
+
+                standStep.set(ActivationStep.FINISHED);
+            } else {
+                standStep.set(ActivationStep.DURING);
+            }
+        } else {
             firstPosition = null;
             secondPosition = null;
 
@@ -131,7 +175,7 @@ public class BlockCounterClient implements ClientModInitializer {
             player.sendMessage(
                     Text.literal("Right click first position...")
                             .formatted(Random.chatColorToFormat(config.chatColor)),
-                    false
+                    !config.msgDisplayLocation.equals(MessageDisplay.CHAT)
             );
 
             firstPosition = null;
@@ -139,15 +183,21 @@ public class BlockCounterClient implements ClientModInitializer {
 
             clickStep.set(ActivationStep.STARTED);
 
-        } else {
+        } else if (clickStep.get().equals(ActivationStep.STARTED)) {
 
             player.sendMessage(
                     Text.literal("Block count aborted.")
                             .formatted(Random.chatColorToFormat(config.chatColor)),
-                    false
+                    !config.msgDisplayLocation.equals(MessageDisplay.CHAT)
             );
 
             clickStep.set(ActivationStep.FINISHED);
+
+            firstPosition = null;
+            secondPosition = null;
+        } else {
+            clickStep.set(ActivationStep.FINISHED);
+
             firstPosition = null;
             secondPosition = null;
         }
@@ -156,26 +206,46 @@ public class BlockCounterClient implements ClientModInitializer {
     private ActionResult handleClick(PlayerEntity player, BlockPos pos) {
 
         if (clickStep.get().equals(ActivationStep.STARTED)) {
-            firstPosition = new Vec3d(pos.getX(), pos.getY(), pos.getZ());
+            firstPosition = Vec3d.of(pos);
             secondPosition = null;
 
             printFirst(player);
 
             clickStep.set(ActivationStep.DURING);
 
+            player.sendMessage(
+                    Text.literal("Right click second position...")
+                            .formatted(Random.chatColorToFormat(config.chatColor)),
+                    !config.msgDisplayLocation.equals(MessageDisplay.CHAT)
+            );
+
             return ActionResult.FAIL;
 
         } else if (clickStep.get().equals(ActivationStep.DURING)) {
-            secondPosition = new Vec3d(pos.getX(), pos.getY(), pos.getZ());
 
-            printSecond(player);
+            if (!this.lineConfigService.canPlaceLine()) {
+                secondPosition = Vec3d.of(pos);
 
-            firstPosition = null;
-            secondPosition = null;
+                printSecond(player);
 
-            clickStep.set(ActivationStep.FINISHED);
+                firstPosition = null;
+                secondPosition = null;
 
-            return ActionResult.FAIL;
+                clickStep.set(ActivationStep.FINISHED);
+
+                return ActionResult.FAIL;
+            } else {
+
+                if (secondPosition == null) {
+                    secondPosition = Vec3d.of(pos);
+                    printSecond(player);
+
+                    return ActionResult.FAIL;
+                } else {
+                    return ActionResult.PASS;
+                }
+
+            }
 
         } else {
             return ActionResult.PASS;
@@ -195,7 +265,7 @@ public class BlockCounterClient implements ClientModInitializer {
             player.sendMessage(Text.literal(
                                     simplify ? String.format(firstPosShort, first) : String.format(firstPosLong, first))
                             .formatted(Random.chatColorToFormat(config.chatColor)),
-                    false
+                    !config.msgDisplayLocation.equals(MessageDisplay.CHAT)
             );
         }
     }
@@ -213,11 +283,20 @@ public class BlockCounterClient implements ClientModInitializer {
             player.sendMessage(
                     Text.literal(simplify ? String.format(secondPosShort, second) : String.format(secondPosLong, second))
                             .formatted(Random.chatColorToFormat(config.chatColor)),
-                    false
+                    !config.msgDisplayLocation.equals(MessageDisplay.CHAT)
             );
         }
 
-        int dist = BlockCalculations.calculateBlocksOne(firstPosition, secondPosition, isClick);
+        int dist;
+        if (this.lineConfigService.isAxisAligned()) {
+            if (!this.lineConfigService.isTwoAxis()) {
+                dist = BlockCalculations.calculateBlocksOne(firstPosition, secondPosition, isClick);
+            } else {
+                dist = BlockCalculations.calculateBlocksTwo(firstPosition, secondPosition, isClick);
+            }
+        } else {
+            dist = BlockCalculations.calculateBlocksFree(firstPosition, secondPosition, isClick);
+        }
 
         String distLong = "Distance: %s %s";
         String distShort = "D: %d";
@@ -227,9 +306,17 @@ public class BlockCounterClient implements ClientModInitializer {
                                 String.format(distShort, dist)
                                 : String.format(distLong, dist, dist == 1 ? "block" : "blocks")))
                         .formatted(Random.chatColorToFormat(config.chatColor)),
-                false
+                !config.msgDisplayLocation.equals(MessageDisplay.CHAT)
         );
 
+    }
+
+    public LineConfigService getLineConfigService() {
+        return this.lineConfigService;
+    }
+
+    public static BlockCounterClient getInstance() {
+        return INSTANCE;
     }
 
 }

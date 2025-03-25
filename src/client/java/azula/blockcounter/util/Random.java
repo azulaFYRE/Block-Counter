@@ -34,4 +34,8 @@ public class Random {
         };
 
     }
+
+    public static Vec3d toIntVec(Vec3d vec) {
+        return new Vec3d((int) vec.x, (int) vec.y, (int) vec.z);
+    }
 }

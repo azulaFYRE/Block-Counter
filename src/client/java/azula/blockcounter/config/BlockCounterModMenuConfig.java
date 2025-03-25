@@ -13,6 +13,10 @@ public class BlockCounterModMenuConfig implements ConfigData {
     public ActivationMethod activationMethod = ActivationMethod.STANDING;
 
     @ConfigEntry.Category("General")
+    @ConfigEntry.Gui.EnumHandler(option = ConfigEntry.Gui.EnumHandler.EnumDisplayOption.BUTTON)
+    public MessageDisplay msgDisplayLocation = MessageDisplay.CHAT;
+
+    @ConfigEntry.Category("General")
     public boolean showPosMessages = true;
 
     @ConfigEntry.Category("General")
