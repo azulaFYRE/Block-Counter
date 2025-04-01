@@ -43,7 +43,7 @@ public interface RenderService {
 
         if (context.matrixStack() != null) {
             // CHANGE THIS LATER TO BE TRUE ONCE IT GETS FIXED
-            RenderLayer layer = CustomRenderLayers.getLines(1.0f, false);
+            RenderLayer layer = CustomRenderLayers.getLines(1.0f, true);
 
             me.x150.renderer.util.Color other = new me.x150.renderer.util.Color(color);
 
