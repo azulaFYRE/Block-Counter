@@ -57,7 +57,12 @@ public class LineConfigScreen extends Screen {
                 .pos(
                         (this.width - this.configWidth) / 2 + padding,
                         yStart)
-                .callback((btn, b) -> this.configService.setPlaceLine(b))
+                .callback((btn, b) -> {
+                    this.configService.setPlaceLine(b);
+                    this.configService.setXOffset(0);
+                    this.configService.setYOffset(0);
+                    this.configService.setZOffset(0);
+                })
                 .checked(this.configService.canPlaceLine())
                 .build();
 
