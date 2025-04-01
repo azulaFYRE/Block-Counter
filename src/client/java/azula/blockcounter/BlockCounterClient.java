@@ -119,17 +119,26 @@ public class BlockCounterClient implements ClientModInitializer {
         });
 
         UseBlockCallback.EVENT.register((playerEntity, world, hand, blockHitResult) -> {
-            if (this.config.activationMethod.equals(ActivationMethod.CLICK)
-                    && !this.clickStep.get().equals(ActivationStep.FINISHED)) {
-                return ActionResult.FAIL;
+            if (this.config.activationMethod.equals(ActivationMethod.CLICK)) {
+                if (this.lineConfigService.canPlaceLine()) {
+                    if (this.clickStep.get().equals(ActivationStep.STARTED)) {
+                        return ActionResult.FAIL;
+                    } else if (this.clickStep.get().equals(ActivationStep.DURING) && this.secondPosition == null) {
+                        return ActionResult.FAIL;
+                    } else {
+                        return ActionResult.PASS;
+                    }
+                } else {
+                    if (!this.clickStep.get().equals(ActivationStep.FINISHED)) {
+                        return ActionResult.FAIL;
+                    } else {
+                        return ActionResult.PASS;
+                    }
+                }
+            } else {
+                return ActionResult.PASS;
             }
 
-            if (this.config.activationMethod.equals(ActivationMethod.STANDING)
-                    && !this.standStep.get().equals(ActivationStep.FINISHED)) {
-                return ActionResult.FAIL;
-            }
-
-            return ActionResult.PASS;
         });
 
         // Block rendering
