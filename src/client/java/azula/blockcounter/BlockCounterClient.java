@@ -17,10 +17,14 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
+import net.fabricmc.fabric.api.event.player.UseItemCallback;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import org.lwjgl.glfw.GLFW;
@@ -48,6 +52,8 @@ public class BlockCounterClient implements ClientModInitializer {
 
     private Vec3d firstPosition;
     private Vec3d secondPosition;
+
+    private boolean didRightClick = false;
 
     @Override
     public void onInitializeClient() {
@@ -97,15 +103,33 @@ public class BlockCounterClient implements ClientModInitializer {
                     handleClickActivation(client.player);
                 }
             }
+
+            if (client.world != null && client.player != null) {
+                boolean didClick = MinecraftClient.getInstance().mouse.wasRightButtonClicked();
+
+                if (didClick && didClick != this.didRightClick && config.activationMethod.equals(ActivationMethod.CLICK)) {
+                    PlayerEntity player = client.player;
+                    BlockHitResult hitResult = (BlockHitResult) player.raycast(5, 0f, true);
+                    handleClick(client.player, hitResult.getBlockPos());
+                }
+
+                this.didRightClick = didClick;
+            }
+
         });
 
-        // Handle Click Activation Method
-        UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
-            if (config.activationMethod.equals(ActivationMethod.CLICK)) {
-                return handleClick(player, hitResult.getBlockPos());
-            } else {
-                return ActionResult.PASS;
+        UseBlockCallback.EVENT.register((playerEntity, world, hand, blockHitResult) -> {
+            if (this.config.activationMethod.equals(ActivationMethod.CLICK)
+                    && !this.clickStep.get().equals(ActivationStep.FINISHED)) {
+                return ActionResult.FAIL;
             }
+
+            if (this.config.activationMethod.equals(ActivationMethod.STANDING)
+                    && !this.standStep.get().equals(ActivationStep.FINISHED)) {
+                return ActionResult.FAIL;
+            }
+
+            return ActionResult.PASS;
         });
 
         // Block rendering
@@ -203,7 +227,7 @@ public class BlockCounterClient implements ClientModInitializer {
         }
     }
 
-    private ActionResult handleClick(PlayerEntity player, BlockPos pos) {
+    private void handleClick(PlayerEntity player, BlockPos pos) {
 
         if (clickStep.get().equals(ActivationStep.STARTED)) {
             firstPosition = Vec3d.of(pos);
@@ -219,10 +243,7 @@ public class BlockCounterClient implements ClientModInitializer {
                     !config.msgDisplayLocation.equals(MessageDisplay.CHAT)
             );
 
-            return ActionResult.FAIL;
-
         } else if (clickStep.get().equals(ActivationStep.DURING)) {
-
             if (!this.lineConfigService.canPlaceLine()) {
                 secondPosition = Vec3d.of(pos);
 
@@ -232,23 +253,12 @@ public class BlockCounterClient implements ClientModInitializer {
                 secondPosition = null;
 
                 clickStep.set(ActivationStep.FINISHED);
-
-                return ActionResult.FAIL;
             } else {
-
                 if (secondPosition == null) {
                     secondPosition = Vec3d.of(pos);
                     printSecond(player);
-
-                    return ActionResult.FAIL;
-                } else {
-                    return ActionResult.PASS;
                 }
-
             }
-
-        } else {
-            return ActionResult.PASS;
         }
     }
 

@@ -80,25 +80,16 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
     private Vec3d getCrosshairBlockPos() {
 
         MinecraftClient client = MinecraftClient.getInstance();
-        ClientPlayerEntity player = MinecraftClient.getInstance().player;
+        ClientPlayerEntity player = client.player;
 
         // Pretty sure this should technically never happen, just shutting up the IDE for next methods
         assert player != null;
         assert client.world != null;
 
-        Vec3d playerPos = player.getCameraPosVec(1.0f);
-        Vec3d viewDir = player.getRotationVec(1.0f);
-
         int MAX_DIST = 5;
 
         // Raycast to where the player is currently looking
-        BlockHitResult rayCastResult = client.world.raycast(new RaycastContext(
-                playerPos,
-                playerPos.add(viewDir.x * MAX_DIST, viewDir.y * MAX_DIST, viewDir.z * MAX_DIST),
-                RaycastContext.ShapeType.OUTLINE,
-                RaycastContext.FluidHandling.NONE,
-                player
-        ));
+        BlockHitResult rayCastResult = (BlockHitResult) player.raycast(MAX_DIST, 0f, false);
 
         if (rayCastResult != null) {
             return new Vec3d(
