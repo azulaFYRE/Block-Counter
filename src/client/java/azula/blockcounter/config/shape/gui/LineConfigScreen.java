@@ -2,7 +2,6 @@ package azula.blockcounter.config.shape.gui;
 
 import azula.blockcounter.BlockCounterClient;
 import azula.blockcounter.config.shape.LineConfigService;
-import com.mojang.blaze3d.systems.RenderSystem;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.gui.DrawContext;
@@ -57,7 +56,12 @@ public class LineConfigScreen extends Screen {
                 .pos(
                         (this.width - this.configWidth) / 2 + padding,
                         yStart)
-                .callback((btn, b) -> this.configService.setPlaceLine(b))
+                .callback((btn, b) -> {
+                    this.configService.setPlaceLine(b);
+                    this.configService.setXOffset(0);
+                    this.configService.setYOffset(0);
+                    this.configService.setZOffset(0);
+                })
                 .checked(this.configService.canPlaceLine())
                 .build();
 
@@ -186,13 +190,10 @@ public class LineConfigScreen extends Screen {
 
         MatrixStack matrices = context.getMatrices();
 
-        RenderSystem.enableBlend();
-
         matrices.push();
         context.drawTexture(RenderLayer::getGuiTextured, background, (width - configWidth) / 2, (height - configHeight) / 2,
                 0, 0, configWidth, configHeight, 256, 256);
         matrices.pop();
 
-        RenderSystem.disableBlend();
     }
 }

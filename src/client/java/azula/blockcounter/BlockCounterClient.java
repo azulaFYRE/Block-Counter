@@ -122,13 +122,13 @@ public class BlockCounterClient implements ClientModInitializer {
 
                 if (config.activationMethod.equals(ActivationMethod.STANDING)) {
                     blockRenderingService.renderStandingSelection(
-                            context.matrixStack(),
+                            context,
                             firstPosition,
                             lockPos,
                             config);
                 } else {
                     blockRenderingService.renderClickSelection(
-                            context.matrixStack(),
+                            context,
                             firstPosition,
                             lockPos,
                             config);
