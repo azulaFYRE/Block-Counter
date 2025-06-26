@@ -4,6 +4,7 @@ import azula.blockcounter.BlockCounterClient;
 import azula.blockcounter.config.shape.LineConfigService;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.CheckboxWidget;
@@ -12,6 +13,7 @@ import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
+import org.joml.Matrix3x2fStack;
 import org.lwjgl.glfw.GLFW;
 
 @Environment(EnvType.CLIENT)
@@ -188,12 +190,12 @@ public class LineConfigScreen extends Screen {
 
     private void renderBackground(DrawContext context, Identifier background) {
 
-        MatrixStack matrices = context.getMatrices();
+        Matrix3x2fStack matrices = context.getMatrices();
 
-        matrices.push();
-        context.drawTexture(RenderLayer::getGuiTextured, background, (width - configWidth) / 2, (height - configHeight) / 2,
+        matrices.pushMatrix();
+        context.drawTexture(RenderPipelines.GUI_TEXTURED, background, (width - configWidth) / 2, (height - configHeight) / 2,
                 0, 0, configWidth, configHeight, 256, 256);
-        matrices.pop();
+        matrices.popMatrix();
 
     }
 }

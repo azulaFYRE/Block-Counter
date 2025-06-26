@@ -42,7 +42,6 @@ public interface RenderService {
         Vec3d p8 = start.add(0, h, d);
 
         if (context.matrixStack() != null) {
-            // CHANGE THIS LATER TO BE TRUE ONCE IT GETS FIXED
             RenderLayer layer = CustomRenderLayers.getLines(1.0f, true);
 
             me.x150.renderer.util.Color other = new me.x150.renderer.util.Color(color);
