@@ -1,5 +1,5 @@
 plugins {
-	id 'fabric-loom' version '1.10-SNAPSHOT'
+	id 'fabric-loom' version '1.11-SNAPSHOT'
 	id 'maven-publish'
 }
 
@@ -58,8 +58,8 @@ dependencies {
 	}
 
 	// Iris
-	modClientRuntimeOnly(files("libs/iris-fabric-1.9.0+mc1.21.6.jar"))
-	modClientRuntimeOnly(files("libs/sodium-fabric-0.6.13+mc1.21.6.jar"))
+	modClientRuntimeOnly(files("libs/iris-fabric-1.9.4+mc1.21.10.jar"))
+	modClientRuntimeOnly(files("libs/sodium-fabric-0.7.0+mc1.21.9.jar"))
 
 	// 0x3C50 Renderer API
 	include modImplementation("io.github.0x3c50.renderer:renderer-fabric:${renderer_version}")
