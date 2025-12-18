@@ -1,5 +1,5 @@
 plugins {
-	id 'fabric-loom' version '1.10-SNAPSHOT'
+	id 'fabric-loom' version '1.13-SNAPSHOT'
 	id 'maven-publish'
 }
 
@@ -56,9 +56,6 @@ dependencies {
 	modApi("me.shedaniel.cloth:cloth-config-fabric:${clothconfig_version}") {
 		exclude(group: "net.fabricmc.fabric-api")
 	}
-
-	// 0x3C50 Renderer API
-	include modImplementation("io.github.0x3c50.renderer:renderer-fabric:${renderer_version}")
 }
 
 processResources {

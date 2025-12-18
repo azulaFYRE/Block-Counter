@@ -17,14 +17,12 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
-import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import org.lwjgl.glfw.GLFW;
@@ -64,9 +62,6 @@ public class BlockCounterClient implements ClientModInitializer {
 
         // Load config
         this.config = configHolder.getConfig();
-
-        // Load render color
-        this.blockRenderingService.setRenderColors(this.config);
 
         // Grab activation keyBinding
         activationKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
@@ -142,7 +137,7 @@ public class BlockCounterClient implements ClientModInitializer {
         });
 
         // Block rendering
-        WorldRenderEvents.LAST.register(context -> {
+        WorldRenderEvents.AFTER_ENTITIES.register(context -> {
             if (firstPosition != null) {
 
                 BlockPos lockPos = null;
@@ -157,14 +152,12 @@ public class BlockCounterClient implements ClientModInitializer {
                     blockRenderingService.renderStandingSelection(
                             context,
                             firstPosition,
-                            lockPos,
-                            config);
+                            lockPos);
                 } else {
                     blockRenderingService.renderClickSelection(
                             context,
                             firstPosition,
-                            lockPos,
-                            config);
+                            lockPos);
                 }
             }
         });
@@ -336,6 +329,10 @@ public class BlockCounterClient implements ClientModInitializer {
 
     public static BlockCounterClient getInstance() {
         return INSTANCE;
+    }
+
+    public BlockCounterModMenuConfig getConfig() {
+        return this.config;
     }
 
 }
