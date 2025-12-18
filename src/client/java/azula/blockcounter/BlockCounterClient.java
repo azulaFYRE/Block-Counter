@@ -17,14 +17,12 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
-import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import org.lwjgl.glfw.GLFW;
@@ -65,9 +63,6 @@ public class BlockCounterClient implements ClientModInitializer {
         // Load config
         this.config = configHolder.getConfig();
 
-        // Load render color
-        this.blockRenderingService.setRenderColors(this.config);
-
         // Grab activation keyBinding
         activationKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "text.autoconfig.blockcounter.option.activationKey",
@@ -97,7 +92,7 @@ public class BlockCounterClient implements ClientModInitializer {
             while (activationKey.wasPressed()) {
                 assert client.player != null;
 
-                if (config.activationMethod.equals(ActivationMethod.STANDING)) {
+                if (this.config.activationMethod.equals(ActivationMethod.STANDING)) {
                     handleStanding(client.player);
                 } else {
                     handleClickActivation(client.player);
@@ -107,7 +102,7 @@ public class BlockCounterClient implements ClientModInitializer {
             if (client.world != null && client.player != null) {
                 boolean didClick = MinecraftClient.getInstance().mouse.wasRightButtonClicked();
 
-                if (didClick && didClick != this.didRightClick && config.activationMethod.equals(ActivationMethod.CLICK)) {
+                if (didClick && didClick != this.didRightClick && this.config.activationMethod.equals(ActivationMethod.CLICK)) {
                     PlayerEntity player = client.player;
                     BlockHitResult hitResult = (BlockHitResult) player.raycast(5, 0f, true);
                     handleClick(client.player, hitResult.getBlockPos());
@@ -153,18 +148,16 @@ public class BlockCounterClient implements ClientModInitializer {
                     }
                 }
 
-                if (config.activationMethod.equals(ActivationMethod.STANDING)) {
+                if (this.config.activationMethod.equals(ActivationMethod.STANDING)) {
                     blockRenderingService.renderStandingSelection(
-                            context.matrixStack(),
+                            context,
                             firstPosition,
-                            lockPos,
-                            config);
+                            lockPos);
                 } else {
                     blockRenderingService.renderClickSelection(
-                            context.matrixStack(),
+                            context,
                             firstPosition,
-                            lockPos,
-                            config);
+                            lockPos);
                 }
             }
         });
@@ -207,8 +200,8 @@ public class BlockCounterClient implements ClientModInitializer {
 
             player.sendMessage(
                     Text.literal("Right click first position...")
-                            .formatted(Random.chatColorToFormat(config.chatColor)),
-                    !config.msgDisplayLocation.equals(MessageDisplay.CHAT)
+                            .formatted(Random.chatColorToFormat(this.config.chatColor)),
+                    !this.config.msgDisplayLocation.equals(MessageDisplay.CHAT)
             );
 
             firstPosition = null;
@@ -220,8 +213,8 @@ public class BlockCounterClient implements ClientModInitializer {
 
             player.sendMessage(
                     Text.literal("Block count aborted.")
-                            .formatted(Random.chatColorToFormat(config.chatColor)),
-                    !config.msgDisplayLocation.equals(MessageDisplay.CHAT)
+                            .formatted(Random.chatColorToFormat(this.config.chatColor)),
+                    !this.config.msgDisplayLocation.equals(MessageDisplay.CHAT)
             );
 
             clickStep.set(ActivationStep.FINISHED);
@@ -248,8 +241,8 @@ public class BlockCounterClient implements ClientModInitializer {
 
             player.sendMessage(
                     Text.literal("Right click second position...")
-                            .formatted(Random.chatColorToFormat(config.chatColor)),
-                    !config.msgDisplayLocation.equals(MessageDisplay.CHAT)
+                            .formatted(Random.chatColorToFormat(this.config.chatColor)),
+                    !this.config.msgDisplayLocation.equals(MessageDisplay.CHAT)
             );
 
         } else if (clickStep.get().equals(ActivationStep.DURING)) {
@@ -273,8 +266,8 @@ public class BlockCounterClient implements ClientModInitializer {
 
     private void printFirst(PlayerEntity player) {
 
-        if (config.showPosMessages) {
-            boolean simplify = config.simplifiedMessages;
+        if (this.config.showPosMessages) {
+            boolean simplify = this.config.simplifiedMessages;
 
             String first = Random.formatVec3d(firstPosition, "%,.2f");
 
@@ -283,17 +276,17 @@ public class BlockCounterClient implements ClientModInitializer {
 
             player.sendMessage(Text.literal(
                                     simplify ? String.format(firstPosShort, first) : String.format(firstPosLong, first))
-                            .formatted(Random.chatColorToFormat(config.chatColor)),
-                    !config.msgDisplayLocation.equals(MessageDisplay.CHAT)
+                            .formatted(Random.chatColorToFormat(this.config.chatColor)),
+                    !this.config.msgDisplayLocation.equals(MessageDisplay.CHAT)
             );
         }
     }
 
     private void printSecond(PlayerEntity player) {
-        boolean simplify = config.simplifiedMessages;
-        boolean isClick = config.activationMethod.equals(ActivationMethod.CLICK);
+        boolean simplify = this.config.simplifiedMessages;
+        boolean isClick = this.config.activationMethod.equals(ActivationMethod.CLICK);
 
-        if (config.showPosMessages) {
+        if (this.config.showPosMessages) {
             String second = Random.formatVec3d(secondPosition, "%,.2f");
 
             String secondPosLong = "Second: %s";
@@ -301,8 +294,8 @@ public class BlockCounterClient implements ClientModInitializer {
 
             player.sendMessage(
                     Text.literal(simplify ? String.format(secondPosShort, second) : String.format(secondPosLong, second))
-                            .formatted(Random.chatColorToFormat(config.chatColor)),
-                    !config.msgDisplayLocation.equals(MessageDisplay.CHAT)
+                            .formatted(Random.chatColorToFormat(this.config.chatColor)),
+                    !this.config.msgDisplayLocation.equals(MessageDisplay.CHAT)
             );
         }
 
@@ -324,8 +317,8 @@ public class BlockCounterClient implements ClientModInitializer {
                 Text.literal((simplify ?
                                 String.format(distShort, dist)
                                 : String.format(distLong, dist, dist == 1 ? "block" : "blocks")))
-                        .formatted(Random.chatColorToFormat(config.chatColor)),
-                !config.msgDisplayLocation.equals(MessageDisplay.CHAT)
+                        .formatted(Random.chatColorToFormat(this.config.chatColor)),
+                !this.config.msgDisplayLocation.equals(MessageDisplay.CHAT)
         );
 
     }
@@ -336,6 +329,10 @@ public class BlockCounterClient implements ClientModInitializer {
 
     public static BlockCounterClient getInstance() {
         return INSTANCE;
+    }
+
+    public BlockCounterModMenuConfig getConfig() {
+        return this.config;
     }
 
 }

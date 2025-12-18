@@ -1,49 +1,31 @@
 package azula.blockcounter.rendering;
 
 import azula.blockcounter.BlockCounterClient;
-import azula.blockcounter.config.BlockCounterModMenuConfig;
-import azula.blockcounter.config.RenderType;
 import azula.blockcounter.config.shape.LineConfigService;
 import azula.blockcounter.util.BlockCalculations;
 import azula.blockcounter.util.Random;
-import me.x150.renderer.render.Renderer3d;
+import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.RaycastContext;
 
-import java.awt.Color;
 import java.util.ArrayList;
 import java.util.List;
 
 
 public class BlockRenderingServiceImpl implements BlockRenderingService {
 
-    private Color renderColor;
-    private Color edgeColor;
-    private RenderType renderType;
+    private final RenderingService renderingService;
 
-    public void setRenderColors(BlockCounterModMenuConfig config) {
-        int renderRGB = config.renderColor;
-        int edgeRGB = config.edgeColor;
-        int a = config.alpha;
-
-        // Convert to rgba so we don't have to store alpha separately
-        int renderRGBA = (a << 24) | (renderRGB & 0x00FFFFFF);
-        int edgeRGBA = (a << 24) | (edgeRGB & 0x00FFFFFF);
-
-        this.renderColor = new Color(renderRGBA, true);
-        this.edgeColor = new Color(edgeRGBA, true);
-        this.renderType = config.renderType;
-
-        Renderer3d.renderThroughWalls();
+    public BlockRenderingServiceImpl() {
+        this.renderingService = new RenderingServiceImpl();
     }
 
-    public void renderStandingSelection(MatrixStack stack, Vec3d firstPos, BlockPos lockPos, BlockCounterModMenuConfig config) {
+    public void renderStandingSelection(WorldRenderContext context, Vec3d firstPos, BlockPos lockPos) {
 
         if (firstPos != null) {
             assert MinecraftClient.getInstance().player != null;
@@ -60,11 +42,11 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
 
             Vec3d fixedFirst = Vec3d.of(blockPosFirst);
 
-            this.renderLine(config, stack, fixedFirst, toRender, false);
+            this.renderLine(context, fixedFirst, toRender, false);
         }
     }
 
-    public void renderClickSelection(MatrixStack stack, Vec3d firstPos, BlockPos lockPos, BlockCounterModMenuConfig config) {
+    public void renderClickSelection(WorldRenderContext context, Vec3d firstPos, BlockPos lockPos) {
 
         if (firstPos != null) {
             Vec3d secondPos = getCrosshairBlockPos();
@@ -74,7 +56,7 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
             }
 
             if (secondPos != null) {
-                this.renderLine(config, stack, firstPos, secondPos, true);
+                this.renderLine(context, firstPos, secondPos, true);
             }
         }
 
@@ -114,27 +96,25 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
         return null;
     }
 
-    private void renderLine(BlockCounterModMenuConfig config, MatrixStack stack, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
+    private void renderLine(WorldRenderContext context, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
 
         LineConfigService shapeService = BlockCounterClient.getInstance().getLineConfigService();
 
         if (shapeService.isAxisAligned()) {
 
             if (!shapeService.isTwoAxis()) {
-                this.renderSingleLine(config, stack, firstPos, secondPos, isClick);
+                this.renderSingleLine(context, firstPos, secondPos, isClick);
             } else {
-                this.renderDoubleLine(config, stack, firstPos, secondPos, isClick);
+                this.renderDoubleLine(context, firstPos, secondPos, isClick);
             }
 
         } else {
-            this.renderFreeLine(config, stack, firstPos, secondPos, isClick);
+            this.renderFreeLine(context, firstPos, secondPos, isClick);
         }
 
     }
 
-    private void renderSingleLine(BlockCounterModMenuConfig config, MatrixStack stack, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
-
-        this.setRenderColors(config);
+    private void renderSingleLine(WorldRenderContext context, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
 
         LineConfigService service = BlockCounterClient.getInstance().getLineConfigService();
         Vec3d offset = new Vec3d(service.getXOffset(), service.getYOffset(), service.getZOffset());
@@ -180,34 +160,60 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
 
         Direction.Axis dir = BlockCalculations.findLargestAxisDiff(dimensions);
 
-        Vec3d blockDimension = new Vec3d(1, 1, 1);
         int stopIndex = (int) (dir.equals(Direction.Axis.X) ? dimensions.x :
                 (dir.equals(Direction.Axis.Y) ? dimensions.y : dimensions.z));
         Vec3d toAdd = (dir.equals(Direction.Axis.X) ? new Vec3d(1, 0, 0) :
                 (dir.equals(Direction.Axis.Y) ? new Vec3d(0, 1, 0) : new Vec3d(0, 0, 1)));
 
-        Renderer3d.renderThroughWalls();
+        // start the necessary vertex buffer
+        switch (BlockCounterClient.getInstance().getConfig().renderType) {
+            case SOLID -> {
+                this.renderingService.startQuadBuffer();
 
-        if (this.renderType.equals(RenderType.SOLID)) {
-            Renderer3d.renderFilled(stack, this.renderColor, renderPos, dimensions);
-        } else if (this.renderType.equals(RenderType.EDGE_ONLY)) {
-            // render individual blocks
-            for (int b = 0; b < stopIndex; b++) {
-                Renderer3d.renderOutline(stack, this.edgeColor, renderPos, blockDimension);
-                renderPos = renderPos.add(toAdd);
+                for (int b = 0; b < stopIndex; b++) {
+                    this.renderingService.addSolid(context, renderPos);
+                    renderPos = renderPos.add(toAdd);
+                }
+
+                this.renderingService.renderQuadBuffer(context);
             }
-        } else {
-            for (int b = 0; b < stopIndex; b++) {
-                Renderer3d.renderEdged(stack, this.renderColor, this.edgeColor, renderPos, blockDimension);
-                renderPos = renderPos.add(toAdd);
+            case EDGE_ONLY -> {
+                this.renderingService.startLineBuffer();
+
+                for (int b = 0; b < stopIndex; b++) {
+                    this.renderingService.addEdged(context, renderPos);
+                    renderPos = renderPos.add(toAdd);
+                }
+
+                this.renderingService.renderLineBuffer(context);
+            }
+            case SOLID_EDGE -> {
+                this.renderingService.startQuadBuffer();
+
+                Vec3d start = new Vec3d(renderPos.x, renderPos.y, renderPos.z);
+
+                for (int b = 0; b < stopIndex; b++) {
+                    this.renderingService.addSolid(context, renderPos);
+                    renderPos = renderPos.add(toAdd);
+                }
+
+                this.renderingService.renderQuadBuffer(context);
+
+                renderPos = new Vec3d(start.x, start.y, start.z);
+
+                this.renderingService.startLineBuffer();
+
+                for (int b = 0; b < stopIndex; b++) {
+                    this.renderingService.addEdged(context, renderPos);
+                    renderPos = renderPos.add(toAdd);
+                }
+
+                this.renderingService.renderLineBuffer(context);
             }
         }
-
-        Renderer3d.stopRenderThroughWalls();
-
     }
 
-    private void renderDoubleLine(BlockCounterModMenuConfig config, MatrixStack stack, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
+    private void renderDoubleLine(WorldRenderContext context, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
 
         Vec3d firstPosInt = Random.toIntVec(firstPos);
         Vec3d firstStart = new Vec3d(firstPosInt.x, firstPosInt.y, firstPosInt.z);
@@ -229,7 +235,7 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
             firstEnd = new Vec3d(firstStart.x, firstStart.y, secondStart.z);
         }
 
-        this.renderSingleLine(config, stack, firstStart, firstEnd, isClick);
+        this.renderSingleLine(context, firstStart, firstEnd, isClick);
 
         Vec3d secondEnd;
         if (second.equals(Direction.Axis.X)) {
@@ -240,13 +246,13 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
             secondEnd = new Vec3d(firstEnd.x, firstEnd.y, secondStart.z);
         }
 
-        this.renderSingleLine(config, stack, firstEnd, secondEnd, isClick);
+        this.renderSingleLine(context, firstEnd, secondEnd, isClick);
 
     }
 
     // 3D Line Drawing algorithm with slight tweaks
     // https://www.geeksforgeeks.org/bresenhams-algorithm-for-3-d-line-drawing/
-    private void renderFreeLine(BlockCounterModMenuConfig config, MatrixStack stack, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
+    private void renderFreeLine(WorldRenderContext context, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
         LineConfigService service = BlockCounterClient.getInstance().getLineConfigService();
         Vec3d offset = new Vec3d(service.getXOffset(), service.getYOffset(), service.getZOffset());
 
@@ -331,25 +337,36 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
             }
         }
 
-        this.setRenderColors(config);
+        // create the necessary vertex buffer
+        switch (BlockCounterClient.getInstance().getConfig().renderType) {
+            case SOLID -> {
+                this.renderingService.startQuadBuffer();
 
-        Vec3d blockDimension = new Vec3d(1, 1, 1);
+                renderPoints.forEach(p -> this.renderingService.addSolid(context, p));
 
-        Renderer3d.renderThroughWalls();
-
-        for (Vec3d point : renderPoints) {
-
-            if (this.renderType.equals(RenderType.SOLID)) {
-                Renderer3d.renderFilled(stack, this.renderColor, point, blockDimension);
-            } else if (this.renderType.equals(RenderType.EDGE_ONLY)) {
-                Renderer3d.renderOutline(stack, this.edgeColor, point, blockDimension);
-            } else {
-                Renderer3d.renderEdged(stack, this.renderColor, this.edgeColor, point, blockDimension);
+                this.renderingService.renderQuadBuffer(context);
             }
+            case EDGE_ONLY -> {
+                this.renderingService.startLineBuffer();
 
+                renderPoints.forEach(p -> this.renderingService.addEdged(context, p));
+
+                this.renderingService.renderLineBuffer(context);
+            }
+            case SOLID_EDGE -> {
+                this.renderingService.startQuadBuffer();
+
+                renderPoints.forEach(p -> this.renderingService.addSolid(context, p));
+
+                this.renderingService.renderQuadBuffer(context);
+
+                this.renderingService.startLineBuffer();
+
+                renderPoints.forEach(p -> this.renderingService.addEdged(context, p));
+
+                this.renderingService.renderLineBuffer(context);
+            }
         }
-
-        Renderer3d.stopRenderThroughWalls();
     }
 
     private Vec3d findDimensions(Vec3d firstPos, Vec3d secondPos) {
