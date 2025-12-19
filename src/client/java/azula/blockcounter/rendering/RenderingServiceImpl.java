@@ -12,6 +12,8 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.render.OverlayTexture;
 import net.minecraft.client.render.RenderLayer;
+import net.minecraft.client.render.RenderLayers;
+import net.minecraft.client.render.RenderSetup;
 import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.render.VertexFormats;
 import net.minecraft.util.Identifier;
@@ -47,11 +49,9 @@ public class RenderingServiceImpl implements RenderingService {
                     .build()
     );
 
-    public static final RenderLayer COLORED_QUADS_RENDER_LAYER = RenderLayer.of("block_counter_quad_layer", 256,
-            QUAD_PIPELINE, RenderLayer.MultiPhaseParameters.builder().build(false));
+    public static final RenderLayer COLORED_QUADS_RENDER_LAYER = RenderLayer.of("block_counter_quad_layer", RenderSetup.builder(QUAD_PIPELINE).translucent().build());
 
-    public static final RenderLayer LINES_RENDER_LAYER = RenderLayer.of("block_counter_line_layer", 256,
-            LINE_PIPELINE, RenderLayer.MultiPhaseParameters.builder().build(false));
+    public static final RenderLayer LINES_RENDER_LAYER = RenderLayer.of("block_counter_line_layer", RenderSetup.builder(LINE_PIPELINE).translucent().build());
 
     Identifier whiteTexture = Identifier.of(BlockCounterClient.MOD_ID, "textures/random/white.png");
 
@@ -62,8 +62,8 @@ public class RenderingServiceImpl implements RenderingService {
     // but this is the simplest I could find lol.
     public RenderingServiceImpl() {
         if (FabricLoader.getInstance().isModLoaded("iris")) {
-            quadLayer = RenderLayer.getEntityTranslucent(whiteTexture);
-            lineLayer = RenderLayer.getLines();
+            quadLayer = RenderLayers.entityTranslucent(whiteTexture);
+            lineLayer = RenderLayers.lines();
         } else {
             quadLayer = COLORED_QUADS_RENDER_LAYER;
             lineLayer = LINES_RENDER_LAYER;
@@ -98,7 +98,7 @@ public class RenderingServiceImpl implements RenderingService {
 
         if (context.matrices() != null) {
 
-            Vec3d cameraPos = MinecraftClient.getInstance().gameRenderer.getCamera().getPos();
+            Vec3d cameraPos = MinecraftClient.getInstance().gameRenderer.getCamera().getCameraPos();
             Vector3f posInCam = pos.toVector3f().sub(cameraPos.toVector3f());
 
             Matrix4f tranMatrix = context.matrices().peek().getPositionMatrix();
@@ -116,7 +116,7 @@ public class RenderingServiceImpl implements RenderingService {
     public void addEdged(WorldRenderContext context, Vec3d pos) {
         if (context.matrices() != null) {
 
-            Vec3d cameraPos = MinecraftClient.getInstance().gameRenderer.getCamera().getPos();
+            Vec3d cameraPos = MinecraftClient.getInstance().gameRenderer.getCamera().getCameraPos();
             Vector3f posInCam = pos.toVector3f().sub(cameraPos.toVector3f());
 
             Matrix4f tranMatrix = context.matrices().peek().getPositionMatrix();
@@ -213,43 +213,43 @@ public class RenderingServiceImpl implements RenderingService {
         Vector3f front_br = new Vector3f(pos.x + 1, pos.y, pos.z + 1);
 
         // back bottom
-        this.lineBuffer.vertex(tranMatrix, back_br.x, back_br.y, back_br.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
-        this.lineBuffer.vertex(tranMatrix, back_bl.x, back_bl.y, back_bl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(tranMatrix, back_br.x, back_br.y, back_br.z).color(this.edgeColor.getRGB()).normal(1, 1, 1).lineWidth(1.0f);
+        this.lineBuffer.vertex(tranMatrix, back_bl.x, back_bl.y, back_bl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1).lineWidth(1.0f);
         // back right
-        this.lineBuffer.vertex(tranMatrix, back_bl.x, back_bl.y, back_bl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
-        this.lineBuffer.vertex(tranMatrix, back_tl.x, back_tl.y, back_tl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(tranMatrix, back_bl.x, back_bl.y, back_bl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1).lineWidth(1.0f);
+        this.lineBuffer.vertex(tranMatrix, back_tl.x, back_tl.y, back_tl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1).lineWidth(1.0f);
         // back top
-        this.lineBuffer.vertex(tranMatrix, back_tl.x, back_tl.y, back_tl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
-        this.lineBuffer.vertex(tranMatrix, back_tr.x, back_tr.y, back_tr.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(tranMatrix, back_tl.x, back_tl.y, back_tl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1).lineWidth(1.0f);
+        this.lineBuffer.vertex(tranMatrix, back_tr.x, back_tr.y, back_tr.z).color(this.edgeColor.getRGB()).normal(1, 1, 1).lineWidth(1.0f);
         // back left
-        this.lineBuffer.vertex(tranMatrix, back_tr.x, back_tr.y, back_tr.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
-        this.lineBuffer.vertex(tranMatrix, back_br.x, back_br.y, back_br.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(tranMatrix, back_tr.x, back_tr.y, back_tr.z).color(this.edgeColor.getRGB()).normal(1, 1, 1).lineWidth(1.0f);
+        this.lineBuffer.vertex(tranMatrix, back_br.x, back_br.y, back_br.z).color(this.edgeColor.getRGB()).normal(1, 1, 1).lineWidth(1.0f);
 
         // front bottom
-        this.lineBuffer.vertex(tranMatrix, front_bl.x, front_bl.y, front_bl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
-        this.lineBuffer.vertex(tranMatrix, front_br.x, front_br.y, front_br.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(tranMatrix, front_bl.x, front_bl.y, front_bl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1).lineWidth(1.0f);
+        this.lineBuffer.vertex(tranMatrix, front_br.x, front_br.y, front_br.z).color(this.edgeColor.getRGB()).normal(1, 1, 1).lineWidth(1.0f);
         // front right
-        this.lineBuffer.vertex(tranMatrix, front_br.x, front_br.y, front_br.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
-        this.lineBuffer.vertex(tranMatrix, front_tr.x, front_tr.y, front_tr.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(tranMatrix, front_br.x, front_br.y, front_br.z).color(this.edgeColor.getRGB()).normal(1, 1, 1).lineWidth(1.0f);
+        this.lineBuffer.vertex(tranMatrix, front_tr.x, front_tr.y, front_tr.z).color(this.edgeColor.getRGB()).normal(1, 1, 1).lineWidth(1.0f);
         // front top
-        this.lineBuffer.vertex(tranMatrix, front_tr.x, front_tr.y, front_tr.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
-        this.lineBuffer.vertex(tranMatrix, front_tl.x, front_tl.y, front_tl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(tranMatrix, front_tr.x, front_tr.y, front_tr.z).color(this.edgeColor.getRGB()).normal(1, 1, 1).lineWidth(1.0f);
+        this.lineBuffer.vertex(tranMatrix, front_tl.x, front_tl.y, front_tl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1).lineWidth(1.0f);
         // front left
-        this.lineBuffer.vertex(tranMatrix, front_tl.x, front_tl.y, front_tl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
-        this.lineBuffer.vertex(tranMatrix, front_bl.x, front_bl.y, front_bl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(tranMatrix, front_tl.x, front_tl.y, front_tl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1).lineWidth(1.0f);
+        this.lineBuffer.vertex(tranMatrix, front_bl.x, front_bl.y, front_bl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1).lineWidth(1.0f);
 
         // left bottom
-        this.lineBuffer.vertex(tranMatrix, back_bl.x, back_bl.y, back_bl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
-        this.lineBuffer.vertex(tranMatrix, front_bl.x, front_bl.y, front_bl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(tranMatrix, back_bl.x, back_bl.y, back_bl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1).lineWidth(1.0f);
+        this.lineBuffer.vertex(tranMatrix, front_bl.x, front_bl.y, front_bl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1).lineWidth(1.0f);
         // left top
-        this.lineBuffer.vertex(tranMatrix, back_tl.x, back_tl.y, back_tl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
-        this.lineBuffer.vertex(tranMatrix, front_tl.x, front_tl.y, front_tl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(tranMatrix, back_tl.x, back_tl.y, back_tl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1).lineWidth(1.0f);
+        this.lineBuffer.vertex(tranMatrix, front_tl.x, front_tl.y, front_tl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1).lineWidth(1.0f);
 
         // right bottom
-        this.lineBuffer.vertex(tranMatrix, back_br.x, back_br.y, back_br.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
-        this.lineBuffer.vertex(tranMatrix, front_br.x, front_br.y, front_br.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(tranMatrix, back_br.x, back_br.y, back_br.z).color(this.edgeColor.getRGB()).normal(1, 1, 1).lineWidth(1.0f);
+        this.lineBuffer.vertex(tranMatrix, front_br.x, front_br.y, front_br.z).color(this.edgeColor.getRGB()).normal(1, 1, 1).lineWidth(1.0f);
         // right top
-        this.lineBuffer.vertex(tranMatrix, back_tr.x, back_tr.y, back_tr.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
-        this.lineBuffer.vertex(tranMatrix, front_tr.x, front_tr.y, front_tr.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(tranMatrix, back_tr.x, back_tr.y, back_tr.z).color(this.edgeColor.getRGB()).normal(1, 1, 1).lineWidth(1.0f);
+        this.lineBuffer.vertex(tranMatrix, front_tr.x, front_tr.y, front_tr.z).color(this.edgeColor.getRGB()).normal(1, 1, 1).lineWidth(1.0f);
     }
 }
