@@ -15,13 +15,14 @@ import me.shedaniel.autoconfig.serializer.Toml4jConfigSerializer;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
@@ -63,18 +64,21 @@ public class BlockCounterClient implements ClientModInitializer {
         // Load config
         this.config = configHolder.getConfig();
 
+        // Key binding
+        KeyBinding.Category blockCounterCategory = new KeyBinding.Category(Identifier.of("blockcounter"));
+
         // Grab activation keyBinding
         activationKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "text.autoconfig.blockcounter.option.activationKey",
                 GLFW.GLFW_KEY_COMMA,
-                "text.category.blockcounter"
+                blockCounterCategory
         ));
 
         // Grab config menu keyBinding
         configMenuKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "text.autoconfig.blockcounter.option.configMenuKey",
                 GLFW.GLFW_KEY_DELETE,
-                "text.category.blockcounter"
+                blockCounterCategory
         ));
 
         // Handle activation key press
@@ -166,7 +170,7 @@ public class BlockCounterClient implements ClientModInitializer {
     private void handleStanding(PlayerEntity player) {
         if (standStep.get().equals(ActivationStep.FINISHED)) {
 
-            BlockPos firstPos = BlockPos.ofFloored(player.getPos());
+            BlockPos firstPos = BlockPos.ofFloored(player.getEntityPos());
             firstPosition = Vec3d.of(firstPos);
             printFirst(player);
 
@@ -174,7 +178,7 @@ public class BlockCounterClient implements ClientModInitializer {
 
         } else if (standStep.get().equals(ActivationStep.STARTED)) {
 
-            BlockPos secondPos = BlockPos.ofFloored(player.getPos());
+            BlockPos secondPos = BlockPos.ofFloored(player.getEntityPos());
             secondPosition = Vec3d.of(secondPos);
 
             printSecond(player);

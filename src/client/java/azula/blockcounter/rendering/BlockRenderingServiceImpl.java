@@ -4,7 +4,7 @@ import azula.blockcounter.BlockCounterClient;
 import azula.blockcounter.config.shape.LineConfigService;
 import azula.blockcounter.util.BlockCalculations;
 import azula.blockcounter.util.Random;
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
+import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.util.hit.BlockHitResult;
@@ -30,7 +30,7 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
         if (firstPos != null) {
             assert MinecraftClient.getInstance().player != null;
 
-            Vec3d playerPos = MinecraftClient.getInstance().player.getPos();
+            Vec3d playerPos = MinecraftClient.getInstance().player.getEntityPos();
             BlockPos blockPosFirst = BlockPos.ofFloored(firstPos);
             BlockPos blockPosPlayer = BlockPos.ofFloored(playerPos);
             Vec3d toRender = Vec3d.of(blockPosPlayer);

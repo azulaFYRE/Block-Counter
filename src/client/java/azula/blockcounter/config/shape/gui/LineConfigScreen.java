@@ -8,11 +8,11 @@ import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.CheckboxWidget;
+import net.minecraft.client.input.KeyInput;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import org.joml.Matrix3x2fStack;
-import org.lwjgl.glfw.GLFW;
 
 @Environment(EnvType.CLIENT)
 public class LineConfigScreen extends Screen {
@@ -175,10 +175,10 @@ public class LineConfigScreen extends Screen {
     // It seems like overriding this method eliminates the setting of
     // shouldCloseOnEscape
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    public boolean keyPressed(KeyInput keyCode) {
         KeyBinding configKey = BlockCounterClient.configMenuKey;
 
-        if (configKey.matchesKey(keyCode, scanCode) || keyCode == GLFW.GLFW_KEY_ESCAPE) {
+        if (configKey.matchesKey(keyCode) || keyCode.isEscape()) {
             assert client != null;
             client.setScreen(this.parent);
         }

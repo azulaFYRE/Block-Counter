@@ -1,6 +1,6 @@
 package azula.blockcounter.rendering;
 
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
+import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 

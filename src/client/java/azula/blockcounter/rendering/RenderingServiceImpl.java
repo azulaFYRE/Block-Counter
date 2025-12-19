@@ -6,8 +6,9 @@ import com.mojang.blaze3d.pipeline.BlendFunction;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.platform.DepthTestFunction;
 import com.mojang.blaze3d.vertex.VertexFormat;
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
+import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.render.OverlayTexture;
 import net.minecraft.client.render.RenderLayer;
@@ -95,12 +96,12 @@ public class RenderingServiceImpl implements RenderingService {
     @Override
     public void addSolid(WorldRenderContext context, Vec3d pos) {
 
-        if (context.matrixStack() != null) {
+        if (context.matrices() != null) {
 
-            Vec3d cameraPos = context.camera().getPos();
+            Vec3d cameraPos = MinecraftClient.getInstance().gameRenderer.getCamera().getPos();
             Vector3f posInCam = pos.toVector3f().sub(cameraPos.toVector3f());
 
-            Matrix4f tranMatrix = context.matrixStack().peek().getPositionMatrix();
+            Matrix4f tranMatrix = context.matrices().peek().getPositionMatrix();
 
             Vector3f transformPos = new Vector3f();
 
@@ -113,12 +114,12 @@ public class RenderingServiceImpl implements RenderingService {
 
     @Override
     public void addEdged(WorldRenderContext context, Vec3d pos) {
-        if (context.matrixStack() != null) {
+        if (context.matrices() != null) {
 
-            Vec3d cameraPos = context.camera().getPos();
+            Vec3d cameraPos = MinecraftClient.getInstance().gameRenderer.getCamera().getPos();
             Vector3f posInCam = pos.toVector3f().sub(cameraPos.toVector3f());
 
-            Matrix4f tranMatrix = context.matrixStack().peek().getPositionMatrix();
+            Matrix4f tranMatrix = context.matrices().peek().getPositionMatrix();
 
             Vector3f transformPos = new Vector3f();
 
