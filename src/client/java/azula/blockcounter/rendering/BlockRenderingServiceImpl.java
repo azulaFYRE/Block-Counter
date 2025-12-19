@@ -2,9 +2,9 @@ package azula.blockcounter.rendering;
 
 import azula.blockcounter.BlockCounterClient;
 import azula.blockcounter.config.shape.LineConfigService;
+import azula.blockcounter.rendering.world.BlockCounterWorldRenderContext;
 import azula.blockcounter.util.BlockCalculations;
 import azula.blockcounter.util.Random;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.util.hit.BlockHitResult;
@@ -25,7 +25,7 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
     }
 
     @Override
-    public void renderStandingSelection(WorldRenderContext context, Vec3d firstPos, BlockPos lockPos) {
+    public void renderStandingSelection(BlockCounterWorldRenderContext context, Vec3d firstPos, BlockPos lockPos) {
 
         if (firstPos != null) {
             assert MinecraftClient.getInstance().player != null;
@@ -47,7 +47,7 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
     }
 
     @Override
-    public void renderClickSelection(WorldRenderContext context, Vec3d firstPos, BlockPos lockPos) {
+    public void renderClickSelection(BlockCounterWorldRenderContext context, Vec3d firstPos, BlockPos lockPos) {
 
         if (firstPos != null) {
             Vec3d secondPos = getCrosshairBlockPos();
@@ -88,7 +88,7 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
         return null;
     }
 
-    private void renderLine(WorldRenderContext context, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
+    private void renderLine(BlockCounterWorldRenderContext context, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
 
         LineConfigService shapeService = BlockCounterClient.getInstance().getLineConfigService();
 
@@ -106,7 +106,7 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
 
     }
 
-    private void renderSingleLine(WorldRenderContext context, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
+    private void renderSingleLine(BlockCounterWorldRenderContext context, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
 
         LineConfigService service = BlockCounterClient.getInstance().getLineConfigService();
         Vec3d offset = new Vec3d(service.getXOffset(), service.getYOffset(), service.getZOffset());
@@ -193,7 +193,7 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
         }
     }
 
-    private void renderDoubleLine(WorldRenderContext context, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
+    private void renderDoubleLine(BlockCounterWorldRenderContext context, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
 
         Vec3d firstPosInt = Random.toIntVec(firstPos);
         Vec3d firstStart = new Vec3d(firstPosInt.x, firstPosInt.y, firstPosInt.z);
@@ -232,7 +232,7 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
 
     // 3D Line Drawing algorithm with slight tweaks
     // https://www.geeksforgeeks.org/bresenhams-algorithm-for-3-d-line-drawing/
-    private void renderFreeLine(WorldRenderContext context, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
+    private void renderFreeLine(BlockCounterWorldRenderContext context, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
         LineConfigService service = BlockCounterClient.getInstance().getLineConfigService();
         Vec3d offset = new Vec3d(service.getXOffset(), service.getYOffset(), service.getZOffset());
 

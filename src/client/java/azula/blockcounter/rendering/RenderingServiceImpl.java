@@ -2,11 +2,11 @@ package azula.blockcounter.rendering;
 
 import azula.blockcounter.BlockCounterClient;
 import azula.blockcounter.config.BlockCounterModMenuConfig;
+import azula.blockcounter.rendering.world.BlockCounterWorldRenderContext;
 import com.mojang.blaze3d.pipeline.BlendFunction;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.platform.DepthTestFunction;
 import com.mojang.blaze3d.vertex.VertexFormat;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.RenderPipelines;
@@ -83,25 +83,25 @@ public class RenderingServiceImpl implements RenderingService {
         this.edgeColor = new Color(edgeRGBA, true);
     }
 
-    public void startLineBuffer(WorldRenderContext context) {
+    public void startLineBuffer(BlockCounterWorldRenderContext context) {
         this.setRenderColors(BlockCounterClient.getInstance().getConfig());
-        this.lineBuffer = context.consumers().getBuffer(this.lineLayer);
+        this.lineBuffer = context.getVertexConsumerProvider().getBuffer(this.lineLayer);
     }
 
-    public void startQuadBuffer(WorldRenderContext context) {
+    public void startQuadBuffer(BlockCounterWorldRenderContext context) {
         this.setRenderColors(BlockCounterClient.getInstance().getConfig());
-        this.quadBuffer = context.consumers().getBuffer(this.quadLayer);
+        this.quadBuffer = context.getVertexConsumerProvider().getBuffer(this.quadLayer);
     }
 
     @Override
-    public void addSolid(WorldRenderContext context, Vec3d pos) {
+    public void addSolid(BlockCounterWorldRenderContext context, Vec3d pos) {
 
-        if (context.matrices() != null) {
+        if (context.getMatrixStack() != null) {
 
             Vec3d cameraPos = MinecraftClient.getInstance().gameRenderer.getCamera().getPos();
             Vector3f posInCam = pos.toVector3f().sub(cameraPos.toVector3f());
 
-            Matrix4f tranMatrix = context.matrices().peek().getPositionMatrix();
+            Matrix4f tranMatrix = context.getMatrixStack().peek().getPositionMatrix();
 
             Vector3f transformPos = new Vector3f();
 
@@ -113,13 +113,13 @@ public class RenderingServiceImpl implements RenderingService {
     }
 
     @Override
-    public void addEdged(WorldRenderContext context, Vec3d pos) {
-        if (context.matrices() != null) {
+    public void addEdged(BlockCounterWorldRenderContext context, Vec3d pos) {
+        if (context.getMatrixStack() != null) {
 
             Vec3d cameraPos = MinecraftClient.getInstance().gameRenderer.getCamera().getPos();
             Vector3f posInCam = pos.toVector3f().sub(cameraPos.toVector3f());
 
-            Matrix4f tranMatrix = context.matrices().peek().getPositionMatrix();
+            Matrix4f tranMatrix = context.getMatrixStack().peek().getPositionMatrix();
 
             Vector3f transformPos = new Vector3f();
 

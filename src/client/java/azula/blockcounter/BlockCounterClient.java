@@ -7,6 +7,7 @@ import azula.blockcounter.config.shape.LineConfigServiceImpl;
 import azula.blockcounter.config.shape.gui.LineConfigScreen;
 import azula.blockcounter.rendering.BlockRenderingService;
 import azula.blockcounter.rendering.BlockRenderingServiceImpl;
+import azula.blockcounter.rendering.world.BlockCounterWorldRenderEvents;
 import azula.blockcounter.util.BlockCalculations;
 import azula.blockcounter.util.Random;
 import me.shedaniel.autoconfig.AutoConfig;
@@ -15,7 +16,6 @@ import me.shedaniel.autoconfig.serializer.Toml4jConfigSerializer;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
@@ -141,7 +141,7 @@ public class BlockCounterClient implements ClientModInitializer {
         });
 
         // Block rendering
-        WorldRenderEvents.AFTER_ENTITIES.register(context -> {
+        BlockCounterWorldRenderEvents.AFTER_BLOCK_ENTITIES.register(context -> {
             if (firstPosition != null) {
 
                 BlockPos lockPos = null;
