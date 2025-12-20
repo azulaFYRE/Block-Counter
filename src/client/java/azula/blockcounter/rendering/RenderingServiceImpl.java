@@ -10,13 +10,16 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.RenderPipelines;
+import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.OverlayTexture;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.render.VertexFormats;
+import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.Vec3d;
 import org.joml.Matrix4f;
+import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
 import java.awt.Color;
@@ -85,48 +88,56 @@ public class RenderingServiceImpl implements RenderingService {
 
     public void startLineBuffer(BlockCounterWorldRenderContext context) {
         this.setRenderColors(BlockCounterClient.getInstance().getConfig());
-        this.lineBuffer = context.getVertexConsumerProvider().getBuffer(this.lineLayer);
+        this.lineBuffer = context.getVertexConsumer().getBuffer(this.lineLayer);
     }
 
     public void startQuadBuffer(BlockCounterWorldRenderContext context) {
         this.setRenderColors(BlockCounterClient.getInstance().getConfig());
-        this.quadBuffer = context.getVertexConsumerProvider().getBuffer(this.quadLayer);
+        this.quadBuffer = context.getVertexConsumer().getBuffer(this.quadLayer);
     }
 
     @Override
     public void addSolid(BlockCounterWorldRenderContext context, Vec3d pos) {
 
-        if (context.getMatrixStack() != null) {
+        Vec3d cameraPos = MinecraftClient.getInstance().gameRenderer.getCamera().getPos();
+        Vector3f posInCam = pos.toVector3f().sub(cameraPos.toVector3f());
 
-            Vec3d cameraPos = MinecraftClient.getInstance().gameRenderer.getCamera().getPos();
-            Vector3f posInCam = pos.toVector3f().sub(cameraPos.toVector3f());
+        MatrixStack stack = new MatrixStack();
+        stack.push();
+        stack.translate(-cameraPos.x, -cameraPos.y, -cameraPos.z);
+        Matrix4f tranMatrix = stack.peek().getPositionMatrix();
 
-            Matrix4f tranMatrix = context.getMatrixStack().peek().getPositionMatrix();
+        Vector3f transformPos = new Vector3f();
+        tranMatrix.transformPosition(posInCam.x, posInCam.y, posInCam.z, transformPos);
 
-            Vector3f transformPos = new Vector3f();
+        this.addSolidBlockToBuffer(tranMatrix, posInCam);
 
-            tranMatrix.transformPosition(posInCam.x, posInCam.y, posInCam.z, transformPos);
-
-            this.addSolidBlockToBuffer(tranMatrix, transformPos);
-        }
+        stack.pop();
 
     }
 
     @Override
     public void addEdged(BlockCounterWorldRenderContext context, Vec3d pos) {
-        if (context.getMatrixStack() != null) {
+        Camera camera = MinecraftClient.getInstance().gameRenderer.getCamera();
+        Vec3d cameraPos = camera.getPos();
+//        Vector3f posInCam = pos.toVector3f().sub(cameraPos.toVector3f());
 
-            Vec3d cameraPos = MinecraftClient.getInstance().gameRenderer.getCamera().getPos();
-            Vector3f posInCam = pos.toVector3f().sub(cameraPos.toVector3f());
+        MatrixStack stack = new MatrixStack();
+        stack.push();
 
-            Matrix4f tranMatrix = context.getMatrixStack().peek().getPositionMatrix();
+        stack.multiply(camera.getRotation().conjugate());
 
-            Vector3f transformPos = new Vector3f();
+        stack.translate(-cameraPos.x, -cameraPos.y, -cameraPos.z);
+        Matrix4f tranMatrix = stack.peek().getPositionMatrix();
+//        Matrix4f tranMatrix = context.getPositionMatrix();
 
-            tranMatrix.transformPosition(posInCam.x, posInCam.y, posInCam.z, transformPos);
+//        Vector3f transformPos = new Vector3f();
 
-            this.addEdgedBlockToBuffer(tranMatrix, transformPos);
-        }
+//        tranMatrix.transformPosition(posInCam.x, posInCam.y, posInCam.z, transformPos);
+
+        this.addEdgedBlockToBuffer(tranMatrix, pos.toVector3f());
+
+        stack.pop();
     }
 
     private void addSolidBlockToBuffer(Matrix4f tranMatrix, Vector3f pos) {

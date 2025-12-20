@@ -1,41 +1,31 @@
 package azula.blockcounter.rendering.world;
 
-import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.util.math.MatrixStack;
+import org.joml.Matrix4f;
 
 public class BlockCounterWorldRenderContext {
-    private MatrixStack matrixStack;
-    private VertexConsumerProvider vertexConsumerProvider;
-    private Camera camera;
 
-    public BlockCounterWorldRenderContext(MatrixStack matrixStack, VertexConsumerProvider vertexConsumerProvider, Camera camera) {
-        this.matrixStack = matrixStack;
-        this.vertexConsumerProvider = vertexConsumerProvider;
-        this.camera = camera;
+    private VertexConsumerProvider vertexConsumer;
+    private Matrix4f positionMatrix;
+
+    public BlockCounterWorldRenderContext(VertexConsumerProvider vertexConsumer, Matrix4f positionMatrix) {
+        this.vertexConsumer = vertexConsumer;
+        this.positionMatrix = positionMatrix;
     }
 
-    public MatrixStack getMatrixStack() {
-        return matrixStack;
+    public VertexConsumerProvider getVertexConsumer() {
+        return vertexConsumer;
     }
 
-    public void setMatrixStack(MatrixStack matrixStack) {
-        this.matrixStack = matrixStack;
+    public void setVertexConsumer(VertexConsumerProvider vertexConsumer) {
+        this.vertexConsumer = vertexConsumer;
     }
 
-    public VertexConsumerProvider getVertexConsumerProvider() {
-        return vertexConsumerProvider;
+    public Matrix4f getPositionMatrix() {
+        return positionMatrix;
     }
 
-    public void setVertexConsumerProvider(VertexConsumerProvider vertexConsumerProvider) {
-        this.vertexConsumerProvider = vertexConsumerProvider;
-    }
-
-    public Camera getCamera() {
-        return camera;
-    }
-
-    public void setCamera(Camera camera) {
-        this.camera = camera;
+    public void setPositionMatrix(Matrix4f positionMatrix) {
+        this.positionMatrix = positionMatrix;
     }
 }

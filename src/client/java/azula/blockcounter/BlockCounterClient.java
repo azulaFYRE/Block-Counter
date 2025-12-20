@@ -141,7 +141,7 @@ public class BlockCounterClient implements ClientModInitializer {
         });
 
         // Block rendering
-        BlockCounterWorldRenderEvents.AFTER_BLOCK_ENTITIES.register(context -> {
+        BlockCounterWorldRenderEvents.LAST.register(context -> {
             if (firstPosition != null) {
 
                 BlockPos lockPos = null;
