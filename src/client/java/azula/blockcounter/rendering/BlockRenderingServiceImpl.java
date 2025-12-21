@@ -1,7 +1,10 @@
 package azula.blockcounter.rendering;
 
+import azula.blockcounter.ActivationMethod;
 import azula.blockcounter.BlockCounterClient;
-import azula.blockcounter.config.shape.LineConfigService;
+import azula.blockcounter.config.BlockCounterModMenuConfig;
+import azula.blockcounter.config.RenderType;
+import azula.blockcounter.config.shape.ShapeConfigService;
 import azula.blockcounter.util.BlockCalculations;
 import azula.blockcounter.util.Random;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
@@ -47,7 +50,6 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
     }
 
     public void renderClickSelection(WorldRenderContext context, Vec3d firstPos, BlockPos lockPos) {
-
         if (firstPos != null) {
             Vec3d secondPos = getCrosshairBlockPos();
 
@@ -59,10 +61,148 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
                 this.renderLine(context, firstPos, secondPos, true);
             }
         }
+    }
+
+    @Override
+    public void renderQuad(WorldRenderContext context, BlockPos lockPos) {
+        ShapeConfigService shapeService = BlockCounterClient.getInstance().getShapeConfigService();
+        BlockCounterModMenuConfig config = BlockCounterClient.getInstance().getConfig();
+
+        Vec3d offset = new Vec3d(shapeService.getXOffset(), shapeService.getYOffset(), shapeService.getZOffset());
+
+        BlockPos renderBlockPos;
+
+        if (lockPos == null) {
+            if (config.activationMethod.equals(ActivationMethod.STANDING)) {
+                renderBlockPos = BlockPos.ofFloored(
+                        MinecraftClient.getInstance().player.getPos()
+                                .subtract(new Vec3d(0, 1, 0)));
+            } else {
+                Vec3d crosshairPos = getCrosshairBlockPos();
+                if (crosshairPos == null) return;
+                renderBlockPos = BlockPos.ofFloored(crosshairPos);
+            }
+        } else {
+            renderBlockPos = lockPos;
+        }
+
+        int[] dimensions = shapeService.getDimensions(); // w, l, h for quad
+
+        Vec3d renderPos = Vec3d.of(renderBlockPos);
+        renderPos.add(offset);
+
+        Vec3d toAddX = new Vec3d(1, 0, 0);
+        Vec3d toAddY = new Vec3d(0, 1, 0);
+        Vec3d toAddZ = new Vec3d(0, 0, 1);
+
+        Vec3d bottomY = new Vec3d(renderPos.x, renderPos.y, renderPos.z);
+        Vec3d topY = new Vec3d(renderPos.x, renderPos.y + dimensions[1] - 1, renderPos.z);
+
+        Vec3d frontX = new Vec3d(renderPos.x, renderPos.y + 1, renderPos.z);
+        Vec3d backX = new Vec3d(renderPos.x + dimensions[0] - 1, renderPos.y + 1, renderPos.z);
+
+        Vec3d leftZ = new Vec3d(renderPos.x + 1, renderPos.y + 1, renderPos.z);
+        Vec3d rightZ = new Vec3d(renderPos.x + 1, renderPos.y + 1, renderPos.z + dimensions[2] - 1);
+
+        switch (config.renderType) {
+            case SOLID -> this.renderingService.startQuadBuffer();
+            case EDGE_ONLY -> this.renderingService.startLineBuffer();
+            case SOLID_EDGE -> {
+                this.renderingService.startQuadBuffer();
+                this.renderingService.startLineBuffer();
+            }
+        }
+
+        // top and bottom
+        for (int z = 0; z < dimensions[0]; z++) {
+            for (int x = 0; x < dimensions[1]; x++) {
+
+                this.quadBlockAdd(config.renderType, context, dimensions[2], bottomY, topY);
+
+                bottomY = bottomY.add(toAddX);
+                topY = topY.add(toAddX);
+            }
+            bottomY = new Vec3d(renderPos.x, bottomY.y, bottomY.z);
+            bottomY = bottomY.add(toAddZ);
+            topY = new Vec3d(renderPos.x, topY.y, topY.z);
+            topY = topY.add(toAddZ);
+        }
+
+        // front and back
+        for (int y = 0; y < dimensions[2] - 2; y++) {
+            for (int z = 0; z < dimensions[0]; z++) {
+
+                this.quadBlockAdd(config.renderType, context, dimensions[1], frontX, backX);
+
+                frontX = frontX.add(toAddZ);
+                backX = backX.add(toAddZ);
+            }
+
+            frontX = new Vec3d(frontX.x, frontX.y, renderPos.z);
+            frontX = frontX.add(toAddY);
+            backX = new Vec3d(backX.x, backX.y, renderPos.z);
+            backX = backX.add(toAddY);
+        }
+
+        // left and right
+        for (int y = 0; y < dimensions[2] - 2; y++) {
+            for (int x = 0; x < dimensions[1] - 2; x++) {
+
+                this.quadBlockAdd(config.renderType, context, dimensions[0], leftZ, rightZ);
+
+                leftZ = leftZ.add(toAddX);
+                rightZ = rightZ.add(toAddX);
+            }
+
+            leftZ = new Vec3d(renderPos.x + 1, leftZ.y, leftZ.z);
+            leftZ = leftZ.add(toAddY);
+            rightZ = new Vec3d(renderPos.x + 1, rightZ.y, rightZ.z);
+            rightZ = rightZ.add(toAddY);
+        }
+
+        switch (config.renderType) {
+            case SOLID -> this.renderingService.renderQuadBuffer(context);
+            case EDGE_ONLY -> this.renderingService.renderLineBuffer(context);
+            case SOLID_EDGE -> {
+                this.renderingService.renderQuadBuffer(context);
+                this.renderingService.renderLineBuffer(context);
+            }
+        }
+    }
+
+    private void quadBlockAdd(RenderType renderType, WorldRenderContext context, int limiter, Vec3d defaultAdd, Vec3d pastLimitAdd) {
+        switch (renderType) {
+            case SOLID -> {
+                this.renderingService.addSolid(context, defaultAdd);
+                if (limiter > 1) this.renderingService.addSolid(context, pastLimitAdd);
+            }
+            case EDGE_ONLY -> {
+                this.renderingService.addEdged(context, defaultAdd);
+                if (limiter > 1) this.renderingService.addEdged(context, pastLimitAdd);
+            }
+            case SOLID_EDGE -> {
+                this.renderingService.addSolid(context, defaultAdd);
+                this.renderingService.addEdged(context, defaultAdd);
+                if (limiter > 1) {
+                    this.renderingService.addSolid(context, pastLimitAdd);
+                    this.renderingService.addEdged(context, pastLimitAdd);
+                }
+            }
+        }
+    }
+
+    @Override
+    public void renderCircle(WorldRenderContext context, BlockPos lockPos, Direction.Axis lockAxis) {
 
     }
 
-    private Vec3d getCrosshairBlockPos() {
+    @Override
+    public void renderSphere(WorldRenderContext context, BlockPos lockPos) {
+
+    }
+
+    @Override
+    public Vec3d getCrosshairBlockPos() {
 
         MinecraftClient client = MinecraftClient.getInstance();
         ClientPlayerEntity player = MinecraftClient.getInstance().player;
@@ -98,7 +238,7 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
 
     private void renderLine(WorldRenderContext context, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
 
-        LineConfigService shapeService = BlockCounterClient.getInstance().getLineConfigService();
+        ShapeConfigService shapeService = BlockCounterClient.getInstance().getShapeConfigService();
 
         if (shapeService.isAxisAligned()) {
 
@@ -116,7 +256,7 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
 
     private void renderSingleLine(WorldRenderContext context, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
 
-        LineConfigService service = BlockCounterClient.getInstance().getLineConfigService();
+        ShapeConfigService service = BlockCounterClient.getInstance().getShapeConfigService();
         Vec3d offset = new Vec3d(service.getXOffset(), service.getYOffset(), service.getZOffset());
 
         Vec3d firstPosInt = Random.toIntVec(firstPos).add(offset);
@@ -253,7 +393,7 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
     // 3D Line Drawing algorithm with slight tweaks
     // https://www.geeksforgeeks.org/bresenhams-algorithm-for-3-d-line-drawing/
     private void renderFreeLine(WorldRenderContext context, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
-        LineConfigService service = BlockCounterClient.getInstance().getLineConfigService();
+        ShapeConfigService service = BlockCounterClient.getInstance().getShapeConfigService();
         Vec3d offset = new Vec3d(service.getXOffset(), service.getYOffset(), service.getZOffset());
 
         Vec3d firstPosInt = Random.toIntVec(firstPos).add(offset);

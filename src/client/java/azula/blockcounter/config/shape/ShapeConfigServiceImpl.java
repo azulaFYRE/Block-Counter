@@ -1,21 +1,40 @@
 package azula.blockcounter.config.shape;
 
-public class LineConfigServiceImpl implements LineConfigService {
+public class ShapeConfigServiceImpl implements ShapeConfigService {
+
+    private Shape selectedShape;
 
     private boolean canPlaceLine;
     private boolean isAxisAligned;
     private boolean isTwoAxis;
+
     private int xOffset;
     private int yOffset;
     private int zOffset;
 
-    public LineConfigServiceImpl() {
+    private int[] quadDims = {3, 3, 3}; // width, length, height
+    private int[] circleDims = {1, 1, 0}; // radius, height, for now...
+    private int[] sphereDims = {1, 0, 0}; // just radius, for now...
+    private int[] EMPTY_DIMS = {0, 0, 0};
+
+    public ShapeConfigServiceImpl() {
+        this.selectedShape = Shape.QUAD;
         this.canPlaceLine = false;
         this.isAxisAligned = true;
         this.isTwoAxis = false;
         this.xOffset = 0;
         this.yOffset = 0;
         this.zOffset = 0;
+    }
+
+    @Override
+    public Shape getSelectedShape() {
+        return this.selectedShape;
+    }
+
+    @Override
+    public void setSelectedShape(Shape shape) {
+        this.selectedShape = shape;
     }
 
     @Override
@@ -79,7 +98,12 @@ public class LineConfigServiceImpl implements LineConfigService {
     }
 
     @Override
-    public LineConfigService getInstance() {
-        return this;
+    public int[] getDimensions() {
+        return switch (this.selectedShape) {
+            case QUAD -> this.quadDims;
+            case CIRCLE -> this.circleDims;
+            case SPHERE -> this.sphereDims;
+            default -> EMPTY_DIMS;
+        };
     }
 }

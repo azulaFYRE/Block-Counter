@@ -1,7 +1,7 @@
 package azula.blockcounter.config.shape.gui;
 
 import azula.blockcounter.BlockCounterClient;
-import azula.blockcounter.config.shape.LineConfigService;
+import azula.blockcounter.config.shape.ShapeConfigService;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -16,11 +16,11 @@ import net.minecraft.util.Identifier;
 import org.lwjgl.glfw.GLFW;
 
 @Environment(EnvType.CLIENT)
-public class LineConfigScreen extends Screen {
+public class ShapeConfigScreen extends Screen {
 
-    private final Identifier BACKGROUND_TEXTURE = Identifier.of(BlockCounterClient.MOD_ID, "textures/gui/line_config_background.png");
+    private final Identifier BACKGROUND_TEXTURE = Identifier.of(BlockCounterClient.MOD_ID, "textures/gui/shape_config_background.png");
 
-    private final LineConfigService configService;
+    private final ShapeConfigService configService;
     protected final Screen parent;
 
     private final int padding = 10;
@@ -37,8 +37,8 @@ public class LineConfigScreen extends Screen {
     private Slider offsetYSlider;
     private Slider offsetZSlider;
 
-    public LineConfigScreen(LineConfigService service, Screen currentScreen) {
-        super(Text.of("Line Config"));
+    public ShapeConfigScreen(ShapeConfigService service, Screen currentScreen) {
+        super(Text.of("Shape Config"));
         this.configService = service;
         this.parent = currentScreen;
     }

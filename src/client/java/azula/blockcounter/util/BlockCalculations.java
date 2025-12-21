@@ -159,6 +159,88 @@ public class BlockCalculations {
         return totalBlocks;
     }
 
+    public static int calculateBlocksQuad(int w, int l, int h, boolean onlyRendered) {
+        int totalBlocks = w * l * h;
+
+        if (onlyRendered) {
+            totalBlocks -= ((w - 2) * (l - 2) * (h - 2));
+        }
+
+        return totalBlocks;
+    }
+
+    public static int calculateBlocksCircle(int radius, int height, boolean onlyRendered) {
+        int totalPoints = 0;
+
+        int rr = radius * radius;
+
+        // Random inefficient algorithm from stack overflow
+        // https://stackoverflow.com/questions/1201200/fast-algorithm-for-drawing-filled-circles
+        for (int x = -radius; x <= radius; x++) {
+            for (int z = -radius; z <= radius; z++) {
+                int xx = x * x;
+                int zz = z * z;
+
+                if (xx + zz < rr + radius) {
+                    // for the bottom
+                    totalPoints++;
+
+                    if (onlyRendered) {
+                        if (height > 1) {
+                            // for the top
+                            totalPoints++;
+
+                            if (xx + zz > rr - radius) {
+                                // for the whole side if an edge
+                                totalPoints += height - 2;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!onlyRendered) {
+            if (height > 1) {
+                totalPoints *= height;
+            }
+        }
+
+        return totalPoints;
+    }
+
+    public static int calculateBlocksSphere(int radius, boolean onlyRendered) {
+
+        int totalPoints = 0;
+        int rr = radius * radius;
+
+        for (int x = -radius; x <= radius; x++) {
+            for (int z = -radius; z <= radius; z++) {
+                for (int y = -radius; y <= radius; y++) {
+                    int xx = x * x;
+                    int yy = y * y;
+                    int zz = z * z;
+
+                    boolean inside = xx + yy + zz < rr + radius;
+
+                    if (onlyRendered) {
+                        if (inside && (xx + yy + zz > rr - radius)) {
+                            totalPoints++;
+                        }
+                    } else {
+                        if (inside) {
+                            totalPoints++;
+                        }
+                    }
+
+                }
+
+            }
+        }
+
+        return totalPoints;
+    }
+
     public static Direction.Axis findLargestAxisDiff(Vec3d firstPos, Vec3d secondPos) {
 
         Vec3d diff = secondPos.subtract(firstPos);

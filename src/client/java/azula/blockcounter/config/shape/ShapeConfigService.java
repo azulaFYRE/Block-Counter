@@ -1,6 +1,9 @@
 package azula.blockcounter.config.shape;
 
-public interface LineConfigService {
+public interface ShapeConfigService {
+
+    Shape getSelectedShape();
+    void setSelectedShape(Shape shape);
 
     boolean canPlaceLine();
     void setPlaceLine(boolean canPlace);
@@ -20,5 +23,5 @@ public interface LineConfigService {
     int getZOffset();
     void setZOffset(int z);
 
-    LineConfigService getInstance();
+    int[] getDimensions();
 }
