@@ -7,7 +7,7 @@ import azula.blockcounter.config.shape.LineConfigServiceImpl;
 import azula.blockcounter.config.shape.gui.LineConfigScreen;
 import azula.blockcounter.rendering.BlockRenderingService;
 import azula.blockcounter.rendering.BlockRenderingServiceImpl;
-import azula.blockcounter.rendering.world.BlockCounterWorldRenderEvents;
+import azula.blockcounter.rendering.world.BlockCounterRenderEvents;
 import azula.blockcounter.util.BlockCalculations;
 import azula.blockcounter.util.Random;
 import me.shedaniel.autoconfig.AutoConfig;
@@ -141,7 +141,7 @@ public class BlockCounterClient implements ClientModInitializer {
         });
 
         // Block rendering
-        BlockCounterWorldRenderEvents.LAST.register(context -> {
+        BlockCounterRenderEvents.AFTER_WORLD.register(context -> {
             if (firstPosition != null) {
 
                 BlockPos lockPos = null;

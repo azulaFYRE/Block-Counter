@@ -2,7 +2,7 @@ package azula.blockcounter.rendering;
 
 import azula.blockcounter.BlockCounterClient;
 import azula.blockcounter.config.BlockCounterModMenuConfig;
-import azula.blockcounter.rendering.world.BlockCounterWorldRenderContext;
+import azula.blockcounter.rendering.world.BlockCounterRenderContext;
 import com.mojang.blaze3d.pipeline.BlendFunction;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.platform.DepthTestFunction;
@@ -10,21 +10,25 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.RenderPipelines;
-import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.OverlayTexture;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.VertexConsumer;
+import net.minecraft.client.render.VertexConsumerProvider;
 import net.minecraft.client.render.VertexFormats;
-import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.client.util.BufferAllocator;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.Vec3d;
 import org.joml.Matrix4f;
-import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
 import java.awt.Color;
 
 public class RenderingServiceImpl implements RenderingService {
+
+    private final int BUFFER_SIZE = 1024;
+
+    private VertexConsumerProvider.Immediate lineProvider = null;
+    private VertexConsumerProvider.Immediate quadProvider = null;
 
     private VertexConsumer lineBuffer = null;
     private VertexConsumer quadBuffer = null;
@@ -86,58 +90,48 @@ public class RenderingServiceImpl implements RenderingService {
         this.edgeColor = new Color(edgeRGBA, true);
     }
 
-    public void startLineBuffer(BlockCounterWorldRenderContext context) {
+    public void startLineBuffer(BlockCounterRenderContext context) {
         this.setRenderColors(BlockCounterClient.getInstance().getConfig());
-        this.lineBuffer = context.getVertexConsumer().getBuffer(this.lineLayer);
+        this.lineProvider = VertexConsumerProvider.immediate(new BufferAllocator(BUFFER_SIZE));
+        this.lineBuffer = this.lineProvider.getBuffer(this.lineLayer);
     }
 
-    public void startQuadBuffer(BlockCounterWorldRenderContext context) {
+    public void startQuadBuffer(BlockCounterRenderContext context) {
         this.setRenderColors(BlockCounterClient.getInstance().getConfig());
-        this.quadBuffer = context.getVertexConsumer().getBuffer(this.quadLayer);
+        this.quadProvider = VertexConsumerProvider.immediate(new BufferAllocator(BUFFER_SIZE));
+        this.quadBuffer = this.quadProvider.getBuffer(this.quadLayer);
     }
 
     @Override
-    public void addSolid(BlockCounterWorldRenderContext context, Vec3d pos) {
-
+    public void addSolid(BlockCounterRenderContext context, Vec3d pos) {
         Vec3d cameraPos = MinecraftClient.getInstance().gameRenderer.getCamera().getPos();
-        Vector3f posInCam = pos.toVector3f().sub(cameraPos.toVector3f());
+        Vector3f posInCam = pos.subtract(cameraPos).toVector3f();
 
-        MatrixStack stack = new MatrixStack();
-        stack.push();
-        stack.translate(-cameraPos.x, -cameraPos.y, -cameraPos.z);
-        Matrix4f tranMatrix = stack.peek().getPositionMatrix();
-
-        Vector3f transformPos = new Vector3f();
-        tranMatrix.transformPosition(posInCam.x, posInCam.y, posInCam.z, transformPos);
+        Matrix4f tranMatrix = context.getMatrixStack().peek().getPositionMatrix();
 
         this.addSolidBlockToBuffer(tranMatrix, posInCam);
-
-        stack.pop();
-
     }
 
     @Override
-    public void addEdged(BlockCounterWorldRenderContext context, Vec3d pos) {
-        Camera camera = MinecraftClient.getInstance().gameRenderer.getCamera();
-        Vec3d cameraPos = camera.getPos();
-//        Vector3f posInCam = pos.toVector3f().sub(cameraPos.toVector3f());
+    public void addEdged(BlockCounterRenderContext context, Vec3d pos) {
+        Vec3d cameraPos = MinecraftClient.getInstance().gameRenderer.getCamera().getPos();
+        Vector3f posInCam = pos.subtract(cameraPos).toVector3f();
 
-        MatrixStack stack = new MatrixStack();
-        stack.push();
+        Matrix4f tranMatrix = context.getMatrixStack().peek().getPositionMatrix();
 
-        stack.multiply(camera.getRotation().conjugate());
+        this.addEdgedBlockToBuffer(tranMatrix, posInCam);
+    }
 
-        stack.translate(-cameraPos.x, -cameraPos.y, -cameraPos.z);
-        Matrix4f tranMatrix = stack.peek().getPositionMatrix();
-//        Matrix4f tranMatrix = context.getPositionMatrix();
+    @Override
+    public void renderLines() {
+        this.lineProvider.draw();
+        this.lineBuffer = null;
+    }
 
-//        Vector3f transformPos = new Vector3f();
-
-//        tranMatrix.transformPosition(posInCam.x, posInCam.y, posInCam.z, transformPos);
-
-        this.addEdgedBlockToBuffer(tranMatrix, pos.toVector3f());
-
-        stack.pop();
+    @Override
+    public void renderQuads() {
+        this.quadProvider.draw();
+        this.quadBuffer = null;
     }
 
     private void addSolidBlockToBuffer(Matrix4f tranMatrix, Vector3f pos) {
