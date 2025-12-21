@@ -2,14 +2,17 @@ package azula.blockcounter.config.shape.gui;
 
 import azula.blockcounter.BlockCounterClient;
 import azula.blockcounter.config.shape.LineConfigService;
+import com.mojang.serialization.Codec;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.CheckboxWidget;
+import net.minecraft.client.gui.widget.ClickableWidget;
 import net.minecraft.client.input.KeyInput;
 import net.minecraft.client.option.KeyBinding;
+import net.minecraft.client.option.SimpleOption;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import org.joml.Matrix3x2fStack;
@@ -32,14 +35,30 @@ public class LineConfigScreen extends Screen {
 
     private CheckboxWidget twoAxisWidget;
 
-    private Slider offsetXSlider;
-    private Slider offsetYSlider;
-    private Slider offsetZSlider;
+    private ClickableWidget offsetXSlider;
+    private ClickableWidget offsetYSlider;
+    private ClickableWidget offsetZSlider;
+
+    private final SimpleOption<Integer> offsetXOption;
+    private final SimpleOption<Integer> offsetYOption;
+    private final SimpleOption<Integer> offsetZOption;
 
     public LineConfigScreen(LineConfigService service, Screen currentScreen) {
         super(Text.of("Line Config"));
         this.configService = service;
         this.parent = currentScreen;
+
+        this.offsetXOption = new SimpleOption<>("option.blockcounter.offset.x", SimpleOption.emptyTooltip(), (text, value) -> Text.of(text.getString() + " " + value),
+                new SimpleOption.ValidatingIntSliderCallbacks(-50, 50, true),
+                Codec.INT.xmap((value) -> value, (value) -> value), this.configService.getXOffset(), this.configService::setXOffset);
+
+        this.offsetYOption = new SimpleOption<>("option.blockcounter.offset.y", SimpleOption.emptyTooltip(), (text, value) -> Text.of(text.getString() + " " + value),
+                new SimpleOption.ValidatingIntSliderCallbacks(-50, 50, true),
+                Codec.INT.xmap((value) -> value, (value) -> value), this.configService.getYOffset(), this.configService::setYOffset);
+
+        this.offsetZOption = new SimpleOption<>("option.blockcounter.offset.z", SimpleOption.emptyTooltip(), (text, value) -> Text.of(text.getString() + " " + value),
+                new SimpleOption.ValidatingIntSliderCallbacks(-50, 50, true),
+                Codec.INT.xmap((value) -> value, (value) -> value), this.configService.getZOffset(), this.configService::setZOffset);
     }
 
     @Override
@@ -49,7 +68,6 @@ public class LineConfigScreen extends Screen {
         yStart = (this.height - this.configHeight) / 2 + padding;
 
         int buttonWidth = configWidth - 2 * padding;
-        int buttonHeight = 2 * padding;
 
         // Line options
         CheckboxWidget placeable = CheckboxWidget.builder(Text.of("Placeable"), this.textRenderer)
@@ -83,55 +101,34 @@ public class LineConfigScreen extends Screen {
 
 
         // Offset sliders
-        Slider offsetX = new Slider(
+
+        this.offsetXSlider = offsetXOption.createWidget(
+                client.options,
                 (this.width - this.configWidth) / 2 + padding,
                 yStart + 4 * ySpacing + 2,
-                buttonWidth,
-                buttonHeight,
-                Text.of("X: 0"),
-                0.5,
-                -50,
-                50,
-                (sldr, v) -> this.configService.setXOffset(v)
-        );
+                buttonWidth);
 
-        Slider offsetY = new Slider(
+        this.offsetYSlider = offsetYOption.createWidget(
+                client.options,
                 (this.width - this.configWidth) / 2 + padding,
                 yStart + 5 * ySpacing + 2,
-                buttonWidth,
-                buttonHeight,
-                Text.of("Y: 0"),
-                0.5,
-                -50,
-                50,
-                (sldr, v) -> this.configService.setYOffset(v)
-        );
+                buttonWidth);
 
-        Slider offsetZ = new Slider(
+        this.offsetZSlider = offsetZOption.createWidget(
+                client.options,
                 (this.width - this.configWidth) / 2 + padding,
                 yStart + 6 * ySpacing + 2,
-                buttonWidth,
-                buttonHeight,
-                Text.of("Z: 0"),
-                0.5,
-                -50,
-                50,
-                (sldr, v) -> this.configService.setZOffset(v)
-        );
+                buttonWidth);
 
         this.addDrawableChild(placeable);
         this.addDrawableChild(axisAligned);
         this.addDrawableChild(twoAxis);
 
-        this.addDrawableChild(offsetX);
-        this.addDrawableChild(offsetY);
-        this.addDrawableChild(offsetZ);
+        this.addDrawableChild(this.offsetXSlider);
+        this.addDrawableChild(this.offsetYSlider);
+        this.addDrawableChild(this.offsetZSlider);
 
         this.twoAxisWidget = twoAxis;
-
-        this.offsetXSlider = offsetX;
-        this.offsetYSlider = offsetY;
-        this.offsetZSlider = offsetZ;
 
     }
 
@@ -147,17 +144,6 @@ public class LineConfigScreen extends Screen {
         this.offsetXSlider.visible = canPlace;
         this.offsetYSlider.visible = canPlace;
         this.offsetZSlider.visible = canPlace;
-
-        if (canPlace) {
-            this.offsetXSlider.setMessage(Text.of("X: " + this.configService.getXOffset()));
-            this.offsetXSlider.setValue(this.configService.getXOffset());
-
-            this.offsetYSlider.setMessage(Text.of("Y: " + this.configService.getYOffset()));
-            this.offsetYSlider.setValue(this.configService.getYOffset());
-
-            this.offsetZSlider.setMessage(Text.of("Z: " + this.configService.getZOffset()));
-            this.offsetZSlider.setValue(this.configService.getZOffset());
-        }
 
         super.render(context, mouseX, mouseY, delta);
 
