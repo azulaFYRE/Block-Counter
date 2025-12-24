@@ -1,12 +1,14 @@
 package azula.blockcounter.config.shape.gui;
 
 import azula.blockcounter.BlockCounterClient;
+import azula.blockcounter.config.shape.Shape;
 import azula.blockcounter.config.shape.ShapeConfigService;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.CheckboxWidget;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.render.RenderLayer;
@@ -31,7 +33,15 @@ public class ShapeConfigScreen extends Screen {
 
     private int yStart;
 
+    private ButtonWidget shapeButton;
+
+    private CheckboxWidget linePlaceable;
+    private CheckboxWidget isAxisAligned;
     private CheckboxWidget twoAxisWidget;
+
+    private Slider quadWidthSlider;
+    private Slider quadLengthSlider;
+    private Slider quadHeightSlider;
 
     private Slider offsetXSlider;
     private Slider offsetYSlider;
@@ -47,16 +57,26 @@ public class ShapeConfigScreen extends Screen {
     protected void init() {
         super.init();
 
-        yStart = (this.height - this.configHeight) / 2 + padding;
+        this.clearChildren();
+
+        yStart = (this.height - this.configHeight) / 3 + padding;
 
         int buttonWidth = configWidth - 2 * padding;
         int buttonHeight = 2 * padding;
 
+        // Shape selector
+        this.shapeButton = ButtonWidget.builder(Text.of("Line"), btn -> {
+            this.configService.cycleShape();
+            this.init();
+        }).position((this.width - this.configWidth) / 2 + padding, yStart)
+                .size(buttonWidth, buttonHeight)
+                .build();
+
         // Line options
-        CheckboxWidget placeable = CheckboxWidget.builder(Text.of("Placeable"), this.textRenderer)
+        this.linePlaceable = CheckboxWidget.builder(Text.of("Placeable"), this.textRenderer)
                 .pos(
                         (this.width - this.configWidth) / 2 + padding,
-                        yStart)
+                        yStart + ySpacing + padding)
                 .callback((btn, b) -> {
                     this.configService.setPlaceLine(b);
                     this.configService.setXOffset(0);
@@ -66,27 +86,63 @@ public class ShapeConfigScreen extends Screen {
                 .checked(this.configService.canPlaceLine())
                 .build();
 
-        CheckboxWidget axisAligned = CheckboxWidget.builder(Text.of("Axis-Aligned"), this.textRenderer)
+        this.isAxisAligned = CheckboxWidget.builder(Text.of("Axis-Aligned"), this.textRenderer)
                 .pos(
                         (this.width - this.configWidth) / 2 + padding,
-                        yStart + ySpacing)
+                        yStart + 2 * ySpacing + padding)
                 .callback((btn, b) -> this.configService.setAxisAligned(b))
                 .checked(this.configService.isAxisAligned())
                 .build();
 
-        CheckboxWidget twoAxis = CheckboxWidget.builder(Text.of("Dual-Axis"), this.textRenderer)
+        this.twoAxisWidget = CheckboxWidget.builder(Text.of("Dual-Axis"), this.textRenderer)
                 .pos(
                         (this.width - this.configWidth) / 2 + padding,
-                        yStart + 2 * ySpacing)
+                        yStart + 3 * ySpacing + padding)
                 .callback((btn, b) -> this.configService.setTwoAxis(b))
                 .checked(this.configService.isTwoAxis())
                 .build();
 
+        // Quad dimension sliders
+        this.quadWidthSlider = new Slider(
+                (this.width - this.configWidth) / 2 + padding,
+                yStart + 3 * ySpacing + 2,
+                buttonWidth,
+                buttonHeight,
+                Text.of("Width: 1"),
+                0,
+                1,
+                50,
+                (sldr, v) -> this.configService.setQuadWidth(v)
+        );
+
+        this.quadLengthSlider = new Slider(
+                (this.width - this.configWidth) / 2 + padding,
+                yStart + 4 * ySpacing + 5,
+                buttonWidth,
+                buttonHeight,
+                Text.of("Length: 1"),
+                0,
+                1,
+                50,
+                (sldr, v) -> this.configService.setQuadLength(v)
+        );
+
+        this.quadHeightSlider = new Slider(
+                (this.width - this.configWidth) / 2 + padding,
+                yStart + 5 * ySpacing + 8,
+                buttonWidth,
+                buttonHeight,
+                Text.of("Height: 1"),
+                0,
+                1,
+                50,
+                (sldr, v) -> this.configService.setQuadHeight(v)
+        );
 
         // Offset sliders
-        Slider offsetX = new Slider(
+        this.offsetXSlider = new Slider(
                 (this.width - this.configWidth) / 2 + padding,
-                yStart + 4 * ySpacing + 2,
+                yStart + 7 * ySpacing + padding + 2,
                 buttonWidth,
                 buttonHeight,
                 Text.of("X: 0"),
@@ -96,9 +152,9 @@ public class ShapeConfigScreen extends Screen {
                 (sldr, v) -> this.configService.setXOffset(v)
         );
 
-        Slider offsetY = new Slider(
+        this.offsetYSlider = new Slider(
                 (this.width - this.configWidth) / 2 + padding,
-                yStart + 5 * ySpacing + 2,
+                yStart + 8 * ySpacing + padding + 5,
                 buttonWidth,
                 buttonHeight,
                 Text.of("Y: 0"),
@@ -108,9 +164,9 @@ public class ShapeConfigScreen extends Screen {
                 (sldr, v) -> this.configService.setYOffset(v)
         );
 
-        Slider offsetZ = new Slider(
+        this.offsetZSlider = new Slider(
                 (this.width - this.configWidth) / 2 + padding,
-                yStart + 6 * ySpacing + 2,
+                yStart + 9 * ySpacing + padding + 8,
                 buttonWidth,
                 buttonHeight,
                 Text.of("Z: 0"),
@@ -120,36 +176,46 @@ public class ShapeConfigScreen extends Screen {
                 (sldr, v) -> this.configService.setZOffset(v)
         );
 
-        this.addDrawableChild(placeable);
-        this.addDrawableChild(axisAligned);
-        this.addDrawableChild(twoAxis);
+        this.addDrawableChild(this.shapeButton);
 
-        this.addDrawableChild(offsetX);
-        this.addDrawableChild(offsetY);
-        this.addDrawableChild(offsetZ);
+        this.addDrawableChild(this.linePlaceable);
+        this.addDrawableChild(this.isAxisAligned);
+        this.addDrawableChild(this.twoAxisWidget);
 
-        this.twoAxisWidget = twoAxis;
+        this.addDrawableChild(this.quadWidthSlider);
+        this.addDrawableChild(this.quadLengthSlider);
+        this.addDrawableChild(this.quadHeightSlider);
 
-        this.offsetXSlider = offsetX;
-        this.offsetYSlider = offsetY;
-        this.offsetZSlider = offsetZ;
-
+        this.addDrawableChild(this.offsetXSlider);
+        this.addDrawableChild(this.offsetYSlider);
+        this.addDrawableChild(this.offsetZSlider);
     }
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
 
-        this.renderBackground(context, BACKGROUND_TEXTURE);
+//        this.renderBackground(context, BACKGROUND_TEXTURE);
 
-        this.twoAxisWidget.visible = this.configService.isAxisAligned();
+        this.shapeButton.setMessage(Text.of(this.configService.getSelectedShape().toString()));
 
-        boolean canPlace = this.configService.canPlaceLine();
+        boolean isLine = this.configService.getSelectedShape().equals(Shape.LINE);
+        boolean isQuad = this.configService.getSelectedShape().equals(Shape.QUAD);
 
-        this.offsetXSlider.visible = canPlace;
-        this.offsetYSlider.visible = canPlace;
-        this.offsetZSlider.visible = canPlace;
+        this.linePlaceable.visible = isLine;
+        this.isAxisAligned.visible = isLine;
+        this.twoAxisWidget.visible = isLine && this.configService.isAxisAligned();
 
-        if (canPlace) {
+        this.quadWidthSlider.visible = isQuad;
+        this.quadLengthSlider.visible = isQuad;
+        this.quadHeightSlider.visible = isQuad;
+
+        boolean showOffset = this.configService.canPlaceLine() || !isLine;
+
+        this.offsetXSlider.visible = showOffset;
+        this.offsetYSlider.visible = showOffset;
+        this.offsetZSlider.visible = showOffset;
+
+        if (showOffset) {
             this.offsetXSlider.setMessage(Text.of("X: " + this.configService.getXOffset()));
             this.offsetXSlider.setValue(this.configService.getXOffset());
 
@@ -160,12 +226,45 @@ public class ShapeConfigScreen extends Screen {
             this.offsetZSlider.setValue(this.configService.getZOffset());
         }
 
+        if (isQuad) {
+            int[] quadDims = this.configService.getDimensions();
+
+            this.quadWidthSlider.setMessage(Text.of("Width: " + quadDims[0]));
+            this.quadWidthSlider.setValue(quadDims[0]);
+
+            this.quadLengthSlider.setMessage(Text.of("Length: " + quadDims[1]));
+            this.quadLengthSlider.setValue(quadDims[1]);
+
+            this.quadHeightSlider.setMessage(Text.of("Height: " + quadDims[2]));
+            this.quadHeightSlider.setValue(quadDims[2]);
+        }
+
         super.render(context, mouseX, mouseY, delta);
 
-        if (canPlace) {
+        if (isQuad) {
+
+            Integer totalCount = BlockCounterClient.getInstance().getBlockRenderingService().getTotalQuadCount(configService.getDimensions());
+            Integer renderCount = BlockCounterClient.getInstance().getBlockRenderingService().getRenderQuadCount(configService.getDimensions());
+
+            context.drawText(this.textRenderer, "Total: " + totalCount + " block(s), " + renderCount + " shown",
+                    (this.width - this.configWidth) / 2 + padding,
+                    yStart + ySpacing + textRenderer.fontHeight,
+                    0xFFFFFFFF,
+                    true
+            );
+
+            context.drawText(this.textRenderer, "Dimensions",
+                    (this.width - this.configWidth) / 2 + padding,
+                    yStart + 2 * ySpacing + textRenderer.fontHeight,
+                    0xFFFFFFFF,
+                    true
+            );
+        }
+
+        if (showOffset) {
             context.drawText(this.textRenderer, "Offset",
                     (this.width - this.configWidth) / 2 + padding,
-                    yStart + 3 * ySpacing + textRenderer.fontHeight,
+                    yStart + 6 * ySpacing + textRenderer.fontHeight + padding,
                     0xFFFFFFFF,
                     true
             );

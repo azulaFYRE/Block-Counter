@@ -392,11 +392,17 @@ public class BlockCounterClient implements ClientModInitializer {
         return this.config;
     }
 
+    public BlockRenderingService getBlockRenderingService() {
+        return this.blockRenderingService;
+    }
+
     public void shapeChanged() {
         this.firstPosition = null;
         this.secondPosition = null;
+
         this.clickStep.set(ActivationStep.FINISHED);
         this.shapeStep.set(ActivationStep.FINISHED);
+
         this.lookAxis = null;
     }
 

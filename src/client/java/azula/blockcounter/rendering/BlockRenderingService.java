@@ -19,4 +19,7 @@ public interface BlockRenderingService {
 
     Vec3d getCrosshairBlockPos();
 
+    Integer getTotalQuadCount(int[] dimensions);
+
+    Integer getRenderQuadCount(int[] dimensions);
 }

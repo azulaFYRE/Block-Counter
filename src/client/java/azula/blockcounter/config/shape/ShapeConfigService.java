@@ -1,5 +1,7 @@
 package azula.blockcounter.config.shape;
 
+import net.minecraft.util.math.Vec3d;
+
 public interface ShapeConfigService {
 
     Shape getSelectedShape();
@@ -14,6 +16,8 @@ public interface ShapeConfigService {
     boolean isTwoAxis();
     void setTwoAxis(boolean twoAxis);
 
+    Vec3d getOffsets();
+
     int getXOffset();
     void setXOffset(int x);
 
@@ -24,4 +28,10 @@ public interface ShapeConfigService {
     void setZOffset(int z);
 
     int[] getDimensions();
+
+    void setQuadWidth(int width);
+    void setQuadLength(int length);
+    void setQuadHeight(int height);
+
+    void cycleShape();
 }

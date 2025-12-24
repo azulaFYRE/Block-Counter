@@ -163,7 +163,11 @@ public class BlockCalculations {
         int totalBlocks = w * l * h;
 
         if (onlyRendered) {
-            totalBlocks -= ((w - 2) * (l - 2) * (h - 2));
+            int realW = w < 3 ? 0 : w - 2;
+            int realL = l < 3 ? 0 : l - 2;
+            int realH = h < 3 ? 0 : h - 2;
+
+            totalBlocks -= (realW * realL * realH);
         }
 
         return totalBlocks;
