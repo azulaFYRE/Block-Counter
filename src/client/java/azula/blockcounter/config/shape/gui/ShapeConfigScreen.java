@@ -43,6 +43,9 @@ public class ShapeConfigScreen extends Screen {
     private Slider quadLengthSlider;
     private Slider quadHeightSlider;
 
+    private Slider circleRadiusSlider;
+    private Slider circleHeightSlider;
+
     private Slider offsetXSlider;
     private Slider offsetYSlider;
     private Slider offsetZSlider;
@@ -139,6 +142,31 @@ public class ShapeConfigScreen extends Screen {
                 (sldr, v) -> this.configService.setQuadHeight(v)
         );
 
+        // Circle dimension sliders
+        this.circleRadiusSlider = new Slider(
+                (this.width - this.configWidth) / 2 + padding,
+                yStart + 3 * ySpacing + 2,
+                buttonWidth,
+                buttonHeight,
+                Text.of("Radius: 1"),
+                0,
+                1,
+                25,
+                (sldr, v) -> this.configService.setCircleRadius(v)
+        );
+
+        this.circleHeightSlider = new Slider(
+                (this.width - this.configWidth) / 2 + padding,
+                yStart + 4 * ySpacing + 5,
+                buttonWidth,
+                buttonHeight,
+                Text.of("Height: 1"),
+                0,
+                1,
+                50,
+                (sldr, v) -> this.configService.setCircleHeight(v)
+        );
+
         // Offset sliders
         this.offsetXSlider = new Slider(
                 (this.width - this.configWidth) / 2 + padding,
@@ -186,6 +214,9 @@ public class ShapeConfigScreen extends Screen {
         this.addDrawableChild(this.quadLengthSlider);
         this.addDrawableChild(this.quadHeightSlider);
 
+        this.addDrawableChild(this.circleRadiusSlider);
+        this.addDrawableChild(this.circleHeightSlider);
+
         this.addDrawableChild(this.offsetXSlider);
         this.addDrawableChild(this.offsetYSlider);
         this.addDrawableChild(this.offsetZSlider);
@@ -200,6 +231,7 @@ public class ShapeConfigScreen extends Screen {
 
         boolean isLine = this.configService.getSelectedShape().equals(Shape.LINE);
         boolean isQuad = this.configService.getSelectedShape().equals(Shape.QUAD);
+        boolean isCircle = this.configService.getSelectedShape().equals(Shape.CIRCLE);
 
         this.linePlaceable.visible = isLine;
         this.isAxisAligned.visible = isLine;
@@ -208,6 +240,9 @@ public class ShapeConfigScreen extends Screen {
         this.quadWidthSlider.visible = isQuad;
         this.quadLengthSlider.visible = isQuad;
         this.quadHeightSlider.visible = isQuad;
+
+        this.circleRadiusSlider.visible = isCircle;
+        this.circleHeightSlider.visible = isCircle;
 
         boolean showOffset = this.configService.canPlaceLine() || !isLine;
 
@@ -239,6 +274,16 @@ public class ShapeConfigScreen extends Screen {
             this.quadHeightSlider.setValue(quadDims[2]);
         }
 
+        if (isCircle) {
+            int[] circleDims = this.configService.getDimensions();
+
+            this.circleRadiusSlider.setMessage(Text.of("Radius: " + circleDims[0]));
+            this.circleRadiusSlider.setValue(circleDims[0]);
+
+            this.circleHeightSlider.setMessage(Text.of("Height: " + circleDims[1]));
+            this.circleHeightSlider.setValue(circleDims[1]);
+        }
+
         super.render(context, mouseX, mouseY, delta);
 
         if (isQuad) {
@@ -260,6 +305,10 @@ public class ShapeConfigScreen extends Screen {
                     true
             );
         }
+
+        // counts here
+//        if (isCircle) {
+//        }
 
         if (showOffset) {
             context.drawText(this.textRenderer, "Offset",

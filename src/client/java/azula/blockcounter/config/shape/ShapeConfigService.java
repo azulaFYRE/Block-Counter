@@ -33,5 +33,10 @@ public interface ShapeConfigService {
     void setQuadLength(int length);
     void setQuadHeight(int height);
 
+    void setCircleRadius(int radius);
+    void setCircleHeight(int height);
+
+    void setSphereRadius(int radius);
+
     void cycleShape();
 }

@@ -30,11 +30,20 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
     private final Map<String, Integer> quadBlockCount = new HashMap<>(); // total blocks
     private final Map<String, Integer> quadRenderCount = new HashMap<>(); // total blocks if only counting rendered
 
+    private final Map<String, ArrayList<Vec3d>> circlePosCache = new HashMap<>();
+    private final Map<String, Integer> circleBlockCount = new HashMap<>();
+    private final Map<String, Integer> circleRenderCount = new HashMap<>();
+
+    private final Map<String, ArrayList<Vec3d>> spherePosCache = new HashMap<>();
+    private final Map<String, Integer> sphereBlockCount = new HashMap<>();
+    private final Map<String, Integer> sphereRenderCount = new HashMap<>();
+
     private Vec3d lastRenderPos = null;
 
     private Shape lastShape = null;
     private Vec3d lastDims = null;
     private Vec3d lastOffsets = null;
+    private Direction.Axis lastLookAxis = null;
 
     public BlockRenderingServiceImpl() {
         this.renderingService = new RenderingServiceImpl();
@@ -120,6 +129,7 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
         this.lastShape = Shape.QUAD;
         this.lastDims = dimensionVec;
         this.lastOffsets = shapeService.getOffsets();
+        this.lastLookAxis = null;
     }
 
     private String quadCacheKey(int[] dimensions) {
@@ -213,8 +223,128 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
     }
 
     @Override
-    public void renderCircle(WorldRenderContext context, BlockPos lockPos, Direction.Axis lockAxis) {
+    public void renderCircle(WorldRenderContext context, BlockPos lockPos, Direction.Axis lookAxis) {
+        ShapeConfigService shapeService = BlockCounterClient.getInstance().getShapeConfigService();
+        BlockCounterModMenuConfig config = BlockCounterClient.getInstance().getConfig();
 
+        Vec3d offset = new Vec3d(shapeService.getXOffset(), shapeService.getYOffset(), shapeService.getZOffset());
+
+        BlockPos renderBlockPos;
+
+        if (lockPos == null) {
+            if (config.activationMethod.equals(ActivationMethod.STANDING)) {
+                renderBlockPos = BlockPos.ofFloored(
+                        MinecraftClient.getInstance().player.getPos()
+                                .subtract(new Vec3d(0, 1, 0)));
+            } else {
+                Vec3d crosshairPos = getCrosshairBlockPos();
+                if (crosshairPos == null) return;
+                renderBlockPos = BlockPos.ofFloored(crosshairPos);
+            }
+        } else {
+            renderBlockPos = lockPos;
+        }
+
+        int[] dimensions = shapeService.getDimensions(); // w, l, h for quad
+
+        Vec3d dimensionVec = new Vec3d(dimensions[0], dimensions[1], dimensions[2]);
+
+        Vec3d renderPos = Vec3d.of(renderBlockPos).add(offset);
+
+        if (!renderPos.equals(this.lastRenderPos)
+                || !Shape.CIRCLE.equals(this.lastShape)
+                || !dimensionVec.equals(this.lastDims)
+                || !shapeService.getOffsets().equals(this.lastOffsets)
+                || (lookAxis != null && !lookAxis.equals(this.lastLookAxis))
+                || (this.lastLookAxis != null && !this.lastLookAxis.equals(lookAxis))) {
+            List<Vec3d> circlePos = this.getCirclePositions(dimensions, lookAxis);
+            List<Vec3d> renderCirclePos = circlePos.stream().map(p -> p.add(renderPos)).toList();
+
+            this.renderingService.rebuildBuffer(renderCirclePos, config.renderType, context);
+        }
+
+        this.renderingService.render(context, config.renderType);
+
+        this.lastRenderPos = renderPos;
+        this.lastShape = Shape.CIRCLE;
+        this.lastDims = dimensionVec;
+        this.lastOffsets = shapeService.getOffsets();
+        this.lastLookAxis = lookAxis;
+    }
+
+    private String circleCacheKey(int[] dimensions, Direction.Axis lockAxis) {
+        String axis = lockAxis != null ? lockAxis.getName() : "none";
+        return axis + ";" + dimensions[0] + ";" + dimensions[1] + ";" + dimensions[2];
+    }
+
+    private List<Vec3d> getCirclePositions(int[] dimensions, Direction.Axis lockAxis) {
+        String circleKey = this.circleCacheKey(dimensions, lockAxis);
+
+        if (this.circlePosCache.containsKey(circleKey)) {
+            return this.circlePosCache.get(circleKey);
+        }
+
+        int radius = dimensions[0];
+        int height = dimensions[1];
+
+        int rr = radius * radius;
+
+        // Random inefficient algorithm from stack overflow
+        // https://stackoverflow.com/questions/1201200/fast-algorithm-for-drawing-filled-circles
+
+        ArrayList<Vec3d> renderPoints = new ArrayList<>();
+
+        for (int x = -radius; x <= radius; x++) {
+            for (int z = -radius; z <= radius; z++) {
+                int xx = x * x;
+                int zz = z * z;
+
+                if (xx + zz < rr + radius) {
+                    Vec3d toAddBottom = new Vec3d(x, 0, z);
+                    if (lockAxis != null) {
+                        if (lockAxis.equals(Direction.Axis.X)) {
+                            toAddBottom = new Vec3d(0, z, x);
+                        } else if (lockAxis.equals(Direction.Axis.Z)){
+                            toAddBottom = new Vec3d(x, z, 0);
+                        }
+                    }
+
+                    renderPoints.add(toAddBottom);
+
+                    if (height > 1) {
+                        Vec3d toAddTop = new Vec3d(x, height - 1, z);
+                        if (lockAxis != null) {
+                            if (lockAxis.equals(Direction.Axis.X)) {
+                                toAddTop = new Vec3d(height - 1, z, x);
+                            } else if (lockAxis.equals(Direction.Axis.Z)){
+                                toAddTop = new Vec3d(x, z, height - 1);
+                            }
+                        }
+
+                        renderPoints.add(toAddTop);
+
+                        if (xx + zz > rr - radius) {
+                            for (int y = 1; y < height - 1; y++) {
+                                Vec3d toAddSides = new Vec3d(x, y, z);
+                                if (lockAxis != null) {
+                                    if (lockAxis.equals(Direction.Axis.X)) {
+                                        toAddSides = new Vec3d(y, z, x);
+                                    } else if (lockAxis.equals(Direction.Axis.Z)){
+                                        toAddSides = new Vec3d(x, z, y);
+                                    }
+                                }
+                                renderPoints.add(toAddSides);
+                            }
+                        }
+                    }
+
+                }
+            }
+        }
+
+        this.circlePosCache.put(circleKey, renderPoints);
+
+        return renderPoints;
     }
 
     @Override

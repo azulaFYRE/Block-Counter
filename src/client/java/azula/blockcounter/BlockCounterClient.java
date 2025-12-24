@@ -138,7 +138,7 @@ public class BlockCounterClient implements ClientModInitializer {
                         }
                     }
                 } else {
-                    if (!this.shapeStep.get().equals(ActivationStep.STARTED)) {
+                    if (this.shapeStep.get().equals(ActivationStep.STARTED)) {
                         return ActionResult.FAIL;
                     }
                 }
@@ -155,6 +155,7 @@ public class BlockCounterClient implements ClientModInitializer {
         switch (this.shapeConfigService.getSelectedShape()) {
             case LINE -> renderLine(context);
             case QUAD -> renderQuad(context);
+            case CIRCLE -> renderCircle(context);
             case SPHERE -> {}
         }
     }
@@ -189,6 +190,19 @@ public class BlockCounterClient implements ClientModInitializer {
             blockRenderingService.renderQuad(context, null);
         } else if (shapeStep.get().equals(ActivationStep.DURING)) {
             blockRenderingService.renderQuad(context, BlockPos.ofFloored(firstPosition));
+        }
+    }
+
+    private void renderCircle(WorldRenderContext context) {
+        if (shapeStep.get().equals(ActivationStep.STARTED)) {
+            // only update look axis during the placement period
+            PlayerEntity player = MinecraftClient.getInstance().player;
+            this.lookAxis = player.isSneaking() ? BlockCalculations.findLargestAxisDiff(this.blockRenderingService.getCrosshairBlockPos(),
+                    new Vec3d(player.getPos().x, player.getPos().y - 1, player.getPos().z)) : null;
+
+            blockRenderingService.renderCircle(context, null, this.lookAxis);
+        } else if (shapeStep.get().equals(ActivationStep.DURING)) {
+            blockRenderingService.renderCircle(context, BlockPos.ofFloored(firstPosition), this.lookAxis);
         }
     }
 

@@ -133,6 +133,21 @@ public class ShapeConfigServiceImpl implements ShapeConfigService {
     }
 
     @Override
+    public void setCircleRadius(int radius) {
+        this.circleDims[0] = radius;
+    }
+
+    @Override
+    public void setCircleHeight(int height) {
+        this.circleDims[1] = height;
+    }
+
+    @Override
+    public void setSphereRadius(int radius) {
+        this.sphereDims[0] = radius;
+    }
+
+    @Override
     public void cycleShape() {
         switch (this.selectedShape) {
             case LINE -> {
