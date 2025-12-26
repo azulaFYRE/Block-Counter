@@ -46,6 +46,8 @@ public class ShapeConfigScreen extends Screen {
     private Slider circleRadiusSlider;
     private Slider circleHeightSlider;
 
+    private Slider sphereRadiusSlider;
+
     private Slider offsetXSlider;
     private Slider offsetYSlider;
     private Slider offsetZSlider;
@@ -167,6 +169,19 @@ public class ShapeConfigScreen extends Screen {
                 (sldr, v) -> this.configService.setCircleHeight(v)
         );
 
+        // Sphere dimension sliders
+        this.sphereRadiusSlider = new Slider(
+                (this.width - this.configWidth) / 2 + padding,
+                yStart + 3 * ySpacing + 2,
+                buttonWidth,
+                buttonHeight,
+                Text.of("Radius: 1"),
+                0,
+                1,
+                25,
+                (sldr, v) -> this.configService.setSphereRadius(v)
+        );
+
         // Offset sliders
         this.offsetXSlider = new Slider(
                 (this.width - this.configWidth) / 2 + padding,
@@ -217,6 +232,8 @@ public class ShapeConfigScreen extends Screen {
         this.addDrawableChild(this.circleRadiusSlider);
         this.addDrawableChild(this.circleHeightSlider);
 
+        this.addDrawableChild(this.sphereRadiusSlider);
+
         this.addDrawableChild(this.offsetXSlider);
         this.addDrawableChild(this.offsetYSlider);
         this.addDrawableChild(this.offsetZSlider);
@@ -232,6 +249,7 @@ public class ShapeConfigScreen extends Screen {
         boolean isLine = this.configService.getSelectedShape().equals(Shape.LINE);
         boolean isQuad = this.configService.getSelectedShape().equals(Shape.QUAD);
         boolean isCircle = this.configService.getSelectedShape().equals(Shape.CIRCLE);
+        boolean isSphere = this.configService.getSelectedShape().equals(Shape.SPHERE);
 
         this.linePlaceable.visible = isLine;
         this.isAxisAligned.visible = isLine;
@@ -243,6 +261,8 @@ public class ShapeConfigScreen extends Screen {
 
         this.circleRadiusSlider.visible = isCircle;
         this.circleHeightSlider.visible = isCircle;
+
+        this.sphereRadiusSlider.visible = isSphere;
 
         boolean showOffset = this.configService.canPlaceLine() || !isLine;
 
@@ -282,6 +302,13 @@ public class ShapeConfigScreen extends Screen {
 
             this.circleHeightSlider.setMessage(Text.of("Height: " + circleDims[1]));
             this.circleHeightSlider.setValue(circleDims[1]);
+        }
+
+        if (isSphere) {
+            int[] sphereDims = this.configService.getDimensions();
+
+            this.sphereRadiusSlider.setMessage(Text.of("Radius: " + sphereDims[0]));
+            this.sphereRadiusSlider.setValue(sphereDims[0]);
         }
 
         super.render(context, mouseX, mouseY, delta);

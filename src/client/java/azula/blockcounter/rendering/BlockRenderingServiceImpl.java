@@ -349,7 +349,90 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
 
     @Override
     public void renderSphere(WorldRenderContext context, BlockPos lockPos) {
+        ShapeConfigService shapeService = BlockCounterClient.getInstance().getShapeConfigService();
+        BlockCounterModMenuConfig config = BlockCounterClient.getInstance().getConfig();
 
+        Vec3d offset = new Vec3d(shapeService.getXOffset(), shapeService.getYOffset(), shapeService.getZOffset());
+
+        BlockPos renderBlockPos;
+
+        if (lockPos == null) {
+            if (config.activationMethod.equals(ActivationMethod.STANDING)) {
+                renderBlockPos = BlockPos.ofFloored(
+                        MinecraftClient.getInstance().player.getPos()
+                                .subtract(new Vec3d(0, 1, 0)));
+            } else {
+                Vec3d crosshairPos = getCrosshairBlockPos();
+                if (crosshairPos == null) return;
+                renderBlockPos = BlockPos.ofFloored(crosshairPos);
+            }
+        } else {
+            renderBlockPos = lockPos;
+        }
+
+        int[] dimensions = shapeService.getDimensions(); // w, l, h for quad
+
+        Vec3d dimensionVec = new Vec3d(dimensions[0], dimensions[1], dimensions[2]);
+
+        Vec3d renderPos = Vec3d.of(renderBlockPos).add(offset);
+
+        if (!renderPos.equals(this.lastRenderPos)
+                || !Shape.SPHERE.equals(this.lastShape)
+                || !dimensionVec.equals(this.lastDims)
+                || !shapeService.getOffsets().equals(this.lastOffsets)) {
+            List<Vec3d> spherePos = this.getSpherePositions(dimensions);
+            List<Vec3d> renderSpherePos = spherePos.stream().map(p -> p.add(renderPos)).toList();
+
+            this.renderingService.rebuildBuffer(renderSpherePos, config.renderType, context);
+        }
+
+        this.renderingService.render(context, config.renderType);
+
+        this.lastRenderPos = renderPos;
+        this.lastShape = Shape.SPHERE;
+        this.lastDims = dimensionVec;
+        this.lastOffsets = shapeService.getOffsets();
+        this.lastLookAxis = null;
+    }
+
+    private String sphereCacheKey(int[] dimensions) {
+        return dimensions[0] + ";";
+    }
+
+    private List<Vec3d> getSpherePositions(int[] dimensions) {
+
+        String sphereKey = this.sphereCacheKey(dimensions);
+
+        if (this.spherePosCache.containsKey(sphereKey)) {
+            return this.spherePosCache.get(sphereKey);
+        }
+
+        int radius = dimensions[0];
+
+        ArrayList<Vec3d> renderPoints = new ArrayList<>();
+
+        int rr = radius * radius;
+
+        // Random inefficient algorithm from stack overflow
+        // https://stackoverflow.com/questions/1201200/fast-algorithm-for-drawing-filled-circles
+
+        for (int x = -radius; x <= radius; x++) {
+            for (int z = -radius; z <= radius; z++) {
+                for (int y = -radius; y <= radius; y++) {
+                    int xx = x * x;
+                    int yy = y * y;
+                    int zz = z * z;
+
+                    if ((xx + yy + zz < rr + radius) && (xx + yy + zz > rr - radius)) {
+                        renderPoints.add(new Vec3d(x, y, z));
+                    }
+                }
+            }
+        }
+
+        this.spherePosCache.put(sphereKey, renderPoints);
+
+        return renderPoints;
     }
 
     @Override

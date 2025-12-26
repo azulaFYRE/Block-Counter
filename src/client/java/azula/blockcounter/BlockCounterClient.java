@@ -156,7 +156,7 @@ public class BlockCounterClient implements ClientModInitializer {
             case LINE -> renderLine(context);
             case QUAD -> renderQuad(context);
             case CIRCLE -> renderCircle(context);
-            case SPHERE -> {}
+            case SPHERE -> renderSphere(context);
         }
     }
 
@@ -203,6 +203,14 @@ public class BlockCounterClient implements ClientModInitializer {
             blockRenderingService.renderCircle(context, null, this.lookAxis);
         } else if (shapeStep.get().equals(ActivationStep.DURING)) {
             blockRenderingService.renderCircle(context, BlockPos.ofFloored(firstPosition), this.lookAxis);
+        }
+    }
+
+    private void renderSphere(WorldRenderContext context) {
+        if (shapeStep.get().equals(ActivationStep.STARTED)) {
+            blockRenderingService.renderSphere(context, null);
+        } else if (shapeStep.get().equals(ActivationStep.DURING)) {
+            blockRenderingService.renderSphere(context, BlockPos.ofFloored(firstPosition));
         }
     }
 
