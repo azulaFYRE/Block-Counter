@@ -2,6 +2,7 @@ package azula.blockcounter.rendering;
 
 import azula.blockcounter.BlockCounterClient;
 import azula.blockcounter.config.BlockCounterModMenuConfig;
+import azula.blockcounter.config.RenderType;
 import com.mojang.blaze3d.pipeline.BlendFunction;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.platform.DepthTestFunction;
@@ -19,22 +20,23 @@ import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
 import java.awt.Color;
+import java.util.List;
 
 public class RenderingServiceImpl implements RenderingService {
-
-    private VertexConsumer lineBuffer = null;
-    private VertexConsumer quadBuffer = null;
 
     private Color renderColor;
     private Color edgeColor;
 
+    private VertexConsumer lineBuffer = null;
+    private VertexConsumer quadBuffer = null;
+
     private static final RenderPipeline QUAD_PIPELINE = RenderPipelines.register(
             RenderPipeline.builder(RenderPipelines.POSITION_COLOR_SNIPPET)
-            .withLocation(Identifier.of(BlockCounterClient.MOD_ID, "pipeline/block_counter_quad_pipeline"))
-            .withVertexFormat(VertexFormats.POSITION_COLOR, VertexFormat.DrawMode.QUADS)
-            .withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
-            .withBlend(BlendFunction.TRANSLUCENT)
-            .build()
+                    .withLocation(Identifier.of(BlockCounterClient.MOD_ID, "pipeline/block_counter_quad_pipeline"))
+                    .withVertexFormat(VertexFormats.POSITION_COLOR, VertexFormat.DrawMode.QUADS)
+                    .withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
+                    .withBlend(BlendFunction.TRANSLUCENT)
+                    .build()
     );
 
     private static final RenderPipeline LINE_PIPELINE = RenderPipelines.register(
@@ -69,6 +71,7 @@ public class RenderingServiceImpl implements RenderingService {
         }
     }
 
+    @Override
     public void setRenderColors(BlockCounterModMenuConfig config) {
         int renderRGB = config.renderColor;
         int edgeRGB = config.edgeColor;
@@ -82,173 +85,233 @@ public class RenderingServiceImpl implements RenderingService {
         this.edgeColor = new Color(edgeRGBA, true);
     }
 
-    public void startLineBuffer(WorldRenderContext context) {
+    @Override
+    public void fillBuffer(List<Vec3d> pos, RenderType renderType, boolean builderMode, WorldRenderContext context) {
+        switch (renderType) {
+            case SOLID -> this.fillQuadBuffer(pos, context, builderMode);
+            case EDGE_ONLY -> this.fillLineBuffer(pos, context, builderMode);
+            case SOLID_EDGE -> {
+                this.fillQuadBuffer(pos, context, builderMode);
+                this.fillLineBuffer(pos, context, builderMode);
+            }
+        }
+    }
+
+    private void fillQuadBuffer(List<Vec3d> pos, WorldRenderContext context, boolean builderMode) {
+        this.startQuadBuffer(context);
+
+        pos.forEach(p -> this.addSolid(context, p, builderMode));
+    }
+
+    private void fillLineBuffer(List<Vec3d> pos, WorldRenderContext context, boolean builderMode) {
+        this.startLineBuffer(context);
+
+        pos.forEach(p -> this.addEdged(context, p, builderMode));
+    }
+
+    private void startLineBuffer(WorldRenderContext context) {
         this.setRenderColors(BlockCounterClient.getInstance().getConfig());
         this.lineBuffer = context.consumers().getBuffer(this.lineLayer);
     }
 
-    public void startQuadBuffer(WorldRenderContext context) {
+    private void startQuadBuffer(WorldRenderContext context) {
         this.setRenderColors(BlockCounterClient.getInstance().getConfig());
         this.quadBuffer = context.consumers().getBuffer(this.quadLayer);
     }
 
-    @Override
-    public void addSolid(WorldRenderContext context, Vec3d pos) {
-
+    private void addSolid(WorldRenderContext context, Vec3d pos, boolean builderMode) {
         if (context.matrixStack() != null) {
-
             Vec3d cameraPos = context.camera().getPos();
             Vector3f posInCam = pos.toVector3f().sub(cameraPos.toVector3f());
 
             Matrix4f tranMatrix = context.matrixStack().peek().getPositionMatrix();
 
             Vector3f transformPos = new Vector3f();
-
             tranMatrix.transformPosition(posInCam.x, posInCam.y, posInCam.z, transformPos);
 
-            this.addSolidBlockToBuffer(tranMatrix, transformPos);
+            this.addSolidBlockToBuffer(transformPos, builderMode);
         }
-
     }
 
-    @Override
-    public void addEdged(WorldRenderContext context, Vec3d pos) {
+    private void addEdged(WorldRenderContext context, Vec3d pos, boolean builderMode) {
         if (context.matrixStack() != null) {
-
             Vec3d cameraPos = context.camera().getPos();
             Vector3f posInCam = pos.toVector3f().sub(cameraPos.toVector3f());
 
             Matrix4f tranMatrix = context.matrixStack().peek().getPositionMatrix();
 
             Vector3f transformPos = new Vector3f();
-
             tranMatrix.transformPosition(posInCam.x, posInCam.y, posInCam.z, transformPos);
 
-            this.addEdgedBlockToBuffer(tranMatrix, transformPos);
+            this.addEdgedBlockToBuffer(transformPos, builderMode);
         }
     }
 
-    private void addSolidBlockToBuffer(Matrix4f tranMatrix, Vector3f pos) {
-        Vector3f back_bl = new Vector3f(pos.x, pos.y, pos.z);
-        Vector3f back_tl = new Vector3f(pos.x, pos.y + 1, pos.z);
-        Vector3f back_tr = new Vector3f(pos.x + 1, pos.y + 1, pos.z);
-        Vector3f back_br = new Vector3f(pos.x + 1, pos.y, pos.z);
+    private void addSolidBlockToBuffer(Vector3f pos, boolean builderMode) {
+        Vector3f back_bl;
+        Vector3f back_tl;
+        Vector3f back_tr;
+        Vector3f back_br;
 
-        Vector3f front_bl = new Vector3f(pos.x, pos.y, pos.z + 1);
-        Vector3f front_tl = new Vector3f(pos.x, pos.y + 1, pos.z + 1);
-        Vector3f front_tr = new Vector3f(pos.x + 1, pos.y + 1, pos.z + 1);
-        Vector3f front_br = new Vector3f(pos.x + 1, pos.y, pos.z + 1);
+        Vector3f front_bl;
+        Vector3f front_tl;
+        Vector3f front_tr;
+        Vector3f front_br;
+
+        if (!builderMode) {
+            back_bl = new Vector3f(pos.x, pos.y, pos.z);
+            back_tl = new Vector3f(pos.x, pos.y + 1, pos.z);
+            back_tr = new Vector3f(pos.x + 1, pos.y + 1, pos.z);
+            back_br = new Vector3f(pos.x + 1, pos.y, pos.z);
+
+            front_bl = new Vector3f(pos.x, pos.y, pos.z + 1);
+            front_tl = new Vector3f(pos.x, pos.y + 1, pos.z + 1);
+            front_tr = new Vector3f(pos.x + 1, pos.y + 1, pos.z + 1);
+            front_br = new Vector3f(pos.x + 1, pos.y, pos.z + 1);
+        } else {
+            back_bl = new Vector3f(pos.x + 0.33f, pos.y + 0.33f, pos.z + 0.33f);
+            back_tl = new Vector3f(pos.x + 0.33f, pos.y + 0.66f, pos.z + 0.33f);
+            back_tr = new Vector3f(pos.x + 0.66f, pos.y + 0.66f, pos.z + 0.33f);
+            back_br = new Vector3f(pos.x + 0.66f, pos.y + 0.33f, pos.z + 0.33f);
+
+            front_bl = new Vector3f(pos.x + 0.33f, pos.y + 0.33f, pos.z + 0.66f);
+            front_tl = new Vector3f(pos.x + 0.33f, pos.y + 0.66f, pos.z + 0.66f);
+            front_tr = new Vector3f(pos.x + 0.66f, pos.y + 0.66f, pos.z + 0.66f);
+            front_br = new Vector3f(pos.x + 0.66f, pos.y + 0.33f, pos.z + 0.66f);
+        }
 
         // back face
-        this.quadBuffer.vertex(tranMatrix, back_br.x, back_br.y, back_br.z).color(this.renderColor.getRGB())
+        this.quadBuffer.vertex(back_br.x, back_br.y, back_br.z).color(this.renderColor.getRGB())
                 .normal(0, 0, -1).texture(0, 1).light(0xF000F0).overlay(OverlayTexture.DEFAULT_UV);
-        this.quadBuffer.vertex(tranMatrix, back_bl.x, back_bl.y, back_bl.z).color(this.renderColor.getRGB())
+        this.quadBuffer.vertex(back_bl.x, back_bl.y, back_bl.z).color(this.renderColor.getRGB())
                 .normal(0, 0, -1).texture(1, 1).light(0xF000F0).overlay(OverlayTexture.DEFAULT_UV);
-        this.quadBuffer.vertex(tranMatrix, back_tl.x, back_tl.y, back_tl.z).color(this.renderColor.getRGB())
+        this.quadBuffer.vertex(back_tl.x, back_tl.y, back_tl.z).color(this.renderColor.getRGB())
                 .normal(0, 0, -1).texture(1, 0).light(0xF000F0).overlay(OverlayTexture.DEFAULT_UV);
-        this.quadBuffer.vertex(tranMatrix, back_tr.x, back_tr.y, back_tr.z).color(this.renderColor.getRGB())
+        this.quadBuffer.vertex(back_tr.x, back_tr.y, back_tr.z).color(this.renderColor.getRGB())
                 .normal(0, 0, -1).texture(0, 0).light(0xF000F0).overlay(OverlayTexture.DEFAULT_UV);
 
         // front face
-        this.quadBuffer.vertex(tranMatrix, front_bl.x, front_bl.y, front_bl.z).color(this.renderColor.getRGB())
+        this.quadBuffer.vertex(front_bl.x, front_bl.y, front_bl.z).color(this.renderColor.getRGB())
                 .normal(0, 0, 1).texture(0, 1).light(0xF000F0).overlay(OverlayTexture.DEFAULT_UV);
-        this.quadBuffer.vertex(tranMatrix, front_br.x, front_br.y, front_br.z).color(this.renderColor.getRGB())
+        this.quadBuffer.vertex(front_br.x, front_br.y, front_br.z).color(this.renderColor.getRGB())
                 .normal(0, 0, 1).texture(1, 1).light(0xF000F0).overlay(OverlayTexture.DEFAULT_UV);
-        this.quadBuffer.vertex(tranMatrix, front_tr.x, front_tr.y, front_tr.z).color(this.renderColor.getRGB())
+        this.quadBuffer.vertex(front_tr.x, front_tr.y, front_tr.z).color(this.renderColor.getRGB())
                 .normal(0, 0, 1).texture(1, 0).light(0xF000F0).overlay(OverlayTexture.DEFAULT_UV);
-        this.quadBuffer.vertex(tranMatrix, front_tl.x, front_tl.y, front_tl.z).color(this.renderColor.getRGB())
+        this.quadBuffer.vertex(front_tl.x, front_tl.y, front_tl.z).color(this.renderColor.getRGB())
                 .normal(0, 0, 1).texture(0, 0).light(0xF000F0).overlay(OverlayTexture.DEFAULT_UV);
 
         // left face
-        this.quadBuffer.vertex(tranMatrix, back_bl.x, back_bl.y, back_bl.z).color(this.renderColor.getRGB())
+        this.quadBuffer.vertex(back_bl.x, back_bl.y, back_bl.z).color(this.renderColor.getRGB())
                 .normal(-1, 0, 0).texture(0, 1).light(0xF000F0).overlay(OverlayTexture.DEFAULT_UV);
-        this.quadBuffer.vertex(tranMatrix, front_bl.x, front_bl.y, front_bl.z).color(this.renderColor.getRGB())
+        this.quadBuffer.vertex(front_bl.x, front_bl.y, front_bl.z).color(this.renderColor.getRGB())
                 .normal(-1, 0, 0).texture(1, 1).light(0xF000F0).overlay(OverlayTexture.DEFAULT_UV);
-        this.quadBuffer.vertex(tranMatrix, front_tl.x, front_tl.y, front_tl.z).color(this.renderColor.getRGB())
+        this.quadBuffer.vertex(front_tl.x, front_tl.y, front_tl.z).color(this.renderColor.getRGB())
                 .normal(-1, 0, 0).texture(1, 0).light(0xF000F0).overlay(OverlayTexture.DEFAULT_UV);
-        this.quadBuffer.vertex(tranMatrix, back_tl.x, back_tl.y, back_tl.z).color(this.renderColor.getRGB())
+        this.quadBuffer.vertex(back_tl.x, back_tl.y, back_tl.z).color(this.renderColor.getRGB())
                 .normal(-1, 0, 0).texture(0, 0).light(0xF000F0).overlay(OverlayTexture.DEFAULT_UV);
 
         // right face
-        this.quadBuffer.vertex(tranMatrix, front_br.x, front_br.y, front_br.z).color(this.renderColor.getRGB())
+        this.quadBuffer.vertex(front_br.x, front_br.y, front_br.z).color(this.renderColor.getRGB())
                 .normal(1, 0, 0).texture(0, 1).light(0xF000F0).overlay(OverlayTexture.DEFAULT_UV);
-        this.quadBuffer.vertex(tranMatrix, back_br.x, back_br.y, back_br.z).color(this.renderColor.getRGB())
+        this.quadBuffer.vertex(back_br.x, back_br.y, back_br.z).color(this.renderColor.getRGB())
                 .normal(1, 0, 0).texture(1, 1).light(0xF000F0).overlay(OverlayTexture.DEFAULT_UV);
-        this.quadBuffer.vertex(tranMatrix, back_tr.x, back_tr.y, back_tr.z).color(this.renderColor.getRGB())
+        this.quadBuffer.vertex(back_tr.x, back_tr.y, back_tr.z).color(this.renderColor.getRGB())
                 .normal(1, 0, 0).texture(1, 0).light(0xF000F0).overlay(OverlayTexture.DEFAULT_UV);
-        this.quadBuffer.vertex(tranMatrix, front_tr.x, front_tr.y, front_tr.z).color(this.renderColor.getRGB())
+        this.quadBuffer.vertex(front_tr.x, front_tr.y, front_tr.z).color(this.renderColor.getRGB())
                 .normal(1, 0, 0).texture(0, 0).light(0xF000F0).overlay(OverlayTexture.DEFAULT_UV);
 
         // top face
-        this.quadBuffer.vertex(tranMatrix, front_tl.x, front_tl.y, front_tl.z).color(this.renderColor.getRGB())
+        this.quadBuffer.vertex(front_tl.x, front_tl.y, front_tl.z).color(this.renderColor.getRGB())
                 .normal(0, 1, 0).texture(0, 1).light(0xF000F0).overlay(OverlayTexture.DEFAULT_UV);
-        this.quadBuffer.vertex(tranMatrix, front_tr.x, front_tr.y, front_tr.z).color(this.renderColor.getRGB())
+        this.quadBuffer.vertex(front_tr.x, front_tr.y, front_tr.z).color(this.renderColor.getRGB())
                 .normal(0, 1, 0).texture(1, 1).light(0xF000F0).overlay(OverlayTexture.DEFAULT_UV);
-        this.quadBuffer.vertex(tranMatrix, back_tr.x, back_tr.y, back_tr.z).color(this.renderColor.getRGB())
+        this.quadBuffer.vertex(back_tr.x, back_tr.y, back_tr.z).color(this.renderColor.getRGB())
                 .normal(0, 1, 0).texture(1, 0).light(0xF000F0).overlay(OverlayTexture.DEFAULT_UV);
-        this.quadBuffer.vertex(tranMatrix, back_tl.x, back_tl.y, back_tl.z).color(this.renderColor.getRGB())
+        this.quadBuffer.vertex(back_tl.x, back_tl.y, back_tl.z).color(this.renderColor.getRGB())
                 .normal(0, 1, 0).texture(0, 0).light(0xF000F0).overlay(OverlayTexture.DEFAULT_UV);
 
         // bottom face
-        this.quadBuffer.vertex(tranMatrix, back_bl.x, back_bl.y, back_bl.z).color(this.renderColor.getRGB())
+        this.quadBuffer.vertex(back_bl.x, back_bl.y, back_bl.z).color(this.renderColor.getRGB())
                 .normal(0, -1, 0).texture(0, 1).light(0xF000F0).overlay(OverlayTexture.DEFAULT_UV);
-        this.quadBuffer.vertex(tranMatrix, back_br.x, back_br.y, back_br.z).color(this.renderColor.getRGB())
+        this.quadBuffer.vertex(back_br.x, back_br.y, back_br.z).color(this.renderColor.getRGB())
                 .normal(0, -1, 0).texture(1, 1).light(0xF000F0).overlay(OverlayTexture.DEFAULT_UV);
-        this.quadBuffer.vertex(tranMatrix, front_br.x, front_br.y, front_br.z).color(this.renderColor.getRGB())
+        this.quadBuffer.vertex(front_br.x, front_br.y, front_br.z).color(this.renderColor.getRGB())
                 .normal(0, -1, 0).texture(1, 0).light(0xF000F0).overlay(OverlayTexture.DEFAULT_UV);
-        this.quadBuffer.vertex(tranMatrix, front_bl.x, front_bl.y, front_bl.z).color(this.renderColor.getRGB())
+        this.quadBuffer.vertex(front_bl.x, front_bl.y, front_bl.z).color(this.renderColor.getRGB())
                 .normal(0, -1, 0).texture(0, 0).light(0xF000F0).overlay(OverlayTexture.DEFAULT_UV);
     }
 
-    private void addEdgedBlockToBuffer(Matrix4f tranMatrix, Vector3f pos) {
-        Vector3f back_bl = new Vector3f(pos.x, pos.y, pos.z);
-        Vector3f back_tl = new Vector3f(pos.x, pos.y + 1, pos.z);
-        Vector3f back_tr = new Vector3f(pos.x + 1, pos.y + 1, pos.z);
-        Vector3f back_br = new Vector3f(pos.x + 1, pos.y, pos.z);
+    private void addEdgedBlockToBuffer(Vector3f pos, boolean builderMode) {
+        Vector3f back_bl;
+        Vector3f back_tl;
+        Vector3f back_tr;
+        Vector3f back_br;
 
-        Vector3f front_bl = new Vector3f(pos.x, pos.y, pos.z + 1);
-        Vector3f front_tl = new Vector3f(pos.x, pos.y + 1, pos.z + 1);
-        Vector3f front_tr = new Vector3f(pos.x + 1, pos.y + 1, pos.z + 1);
-        Vector3f front_br = new Vector3f(pos.x + 1, pos.y, pos.z + 1);
+        Vector3f front_bl;
+        Vector3f front_tl;
+        Vector3f front_tr;
+        Vector3f front_br;
+
+        if (!builderMode) {
+            back_bl = new Vector3f(pos.x, pos.y, pos.z);
+            back_tl = new Vector3f(pos.x, pos.y + 1, pos.z);
+            back_tr = new Vector3f(pos.x + 1, pos.y + 1, pos.z);
+            back_br = new Vector3f(pos.x + 1, pos.y, pos.z);
+
+            front_bl = new Vector3f(pos.x, pos.y, pos.z + 1);
+            front_tl = new Vector3f(pos.x, pos.y + 1, pos.z + 1);
+            front_tr = new Vector3f(pos.x + 1, pos.y + 1, pos.z + 1);
+            front_br = new Vector3f(pos.x + 1, pos.y, pos.z + 1);
+        } else {
+            back_bl = new Vector3f(pos.x + 0.33f, pos.y + 0.33f, pos.z + 0.33f);
+            back_tl = new Vector3f(pos.x + 0.33f, pos.y + 0.66f, pos.z + 0.33f);
+            back_tr = new Vector3f(pos.x + 0.66f, pos.y + 0.66f, pos.z + 0.33f);
+            back_br = new Vector3f(pos.x + 0.66f, pos.y + 0.33f, pos.z + 0.33f);
+
+            front_bl = new Vector3f(pos.x + 0.33f, pos.y + 0.33f, pos.z + 0.66f);
+            front_tl = new Vector3f(pos.x + 0.33f, pos.y + 0.66f, pos.z + 0.66f);
+            front_tr = new Vector3f(pos.x + 0.66f, pos.y + 0.66f, pos.z + 0.66f);
+            front_br = new Vector3f(pos.x + 0.66f, pos.y + 0.33f, pos.z + 0.66f);
+        }
 
         // back bottom
-        this.lineBuffer.vertex(tranMatrix, back_br.x, back_br.y, back_br.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
-        this.lineBuffer.vertex(tranMatrix, back_bl.x, back_bl.y, back_bl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(back_br.x, back_br.y, back_br.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(back_bl.x, back_bl.y, back_bl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
         // back right
-        this.lineBuffer.vertex(tranMatrix, back_bl.x, back_bl.y, back_bl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
-        this.lineBuffer.vertex(tranMatrix, back_tl.x, back_tl.y, back_tl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(back_bl.x, back_bl.y, back_bl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(back_tl.x, back_tl.y, back_tl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
         // back top
-        this.lineBuffer.vertex(tranMatrix, back_tl.x, back_tl.y, back_tl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
-        this.lineBuffer.vertex(tranMatrix, back_tr.x, back_tr.y, back_tr.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(back_tl.x, back_tl.y, back_tl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(back_tr.x, back_tr.y, back_tr.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
         // back left
-        this.lineBuffer.vertex(tranMatrix, back_tr.x, back_tr.y, back_tr.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
-        this.lineBuffer.vertex(tranMatrix, back_br.x, back_br.y, back_br.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(back_tr.x, back_tr.y, back_tr.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(back_br.x, back_br.y, back_br.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
 
         // front bottom
-        this.lineBuffer.vertex(tranMatrix, front_bl.x, front_bl.y, front_bl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
-        this.lineBuffer.vertex(tranMatrix, front_br.x, front_br.y, front_br.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(front_bl.x, front_bl.y, front_bl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(front_br.x, front_br.y, front_br.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
         // front right
-        this.lineBuffer.vertex(tranMatrix, front_br.x, front_br.y, front_br.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
-        this.lineBuffer.vertex(tranMatrix, front_tr.x, front_tr.y, front_tr.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(front_br.x, front_br.y, front_br.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(front_tr.x, front_tr.y, front_tr.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
         // front top
-        this.lineBuffer.vertex(tranMatrix, front_tr.x, front_tr.y, front_tr.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
-        this.lineBuffer.vertex(tranMatrix, front_tl.x, front_tl.y, front_tl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(front_tr.x, front_tr.y, front_tr.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(front_tl.x, front_tl.y, front_tl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
         // front left
-        this.lineBuffer.vertex(tranMatrix, front_tl.x, front_tl.y, front_tl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
-        this.lineBuffer.vertex(tranMatrix, front_bl.x, front_bl.y, front_bl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(front_tl.x, front_tl.y, front_tl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(front_bl.x, front_bl.y, front_bl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
 
         // left bottom
-        this.lineBuffer.vertex(tranMatrix, back_bl.x, back_bl.y, back_bl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
-        this.lineBuffer.vertex(tranMatrix, front_bl.x, front_bl.y, front_bl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(back_bl.x, back_bl.y, back_bl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(front_bl.x, front_bl.y, front_bl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
         // left top
-        this.lineBuffer.vertex(tranMatrix, back_tl.x, back_tl.y, back_tl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
-        this.lineBuffer.vertex(tranMatrix, front_tl.x, front_tl.y, front_tl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(back_tl.x, back_tl.y, back_tl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(front_tl.x, front_tl.y, front_tl.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
 
         // right bottom
-        this.lineBuffer.vertex(tranMatrix, back_br.x, back_br.y, back_br.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
-        this.lineBuffer.vertex(tranMatrix, front_br.x, front_br.y, front_br.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(back_br.x, back_br.y, back_br.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(front_br.x, front_br.y, front_br.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
         // right top
-        this.lineBuffer.vertex(tranMatrix, back_tr.x, back_tr.y, back_tr.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
-        this.lineBuffer.vertex(tranMatrix, front_tr.x, front_tr.y, front_tr.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(back_tr.x, back_tr.y, back_tr.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
+        this.lineBuffer.vertex(front_tr.x, front_tr.y, front_tr.z).color(this.edgeColor.getRGB()).normal(1, 1, 1);
     }
 }

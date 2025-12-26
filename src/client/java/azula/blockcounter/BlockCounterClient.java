@@ -2,9 +2,10 @@ package azula.blockcounter;
 
 import azula.blockcounter.config.BlockCounterModMenuConfig;
 import azula.blockcounter.config.MessageDisplay;
-import azula.blockcounter.config.shape.LineConfigService;
-import azula.blockcounter.config.shape.LineConfigServiceImpl;
-import azula.blockcounter.config.shape.gui.LineConfigScreen;
+import azula.blockcounter.config.shape.Shape;
+import azula.blockcounter.config.shape.ShapeConfigService;
+import azula.blockcounter.config.shape.ShapeConfigServiceImpl;
+import azula.blockcounter.config.shape.gui.ShapeConfigScreen;
 import azula.blockcounter.rendering.BlockRenderingService;
 import azula.blockcounter.rendering.BlockRenderingServiceImpl;
 import azula.blockcounter.util.BlockCalculations;
@@ -15,6 +16,7 @@ import me.shedaniel.autoconfig.serializer.Toml4jConfigSerializer;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.minecraft.client.MinecraftClient;
@@ -24,6 +26,7 @@ import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
@@ -38,15 +41,18 @@ public class BlockCounterClient implements ClientModInitializer {
     private static BlockCounterClient INSTANCE;
 
     private final BlockRenderingService blockRenderingService = new BlockRenderingServiceImpl();
-    private final LineConfigService lineConfigService = new LineConfigServiceImpl();
+    private final ShapeConfigService shapeConfigService = new ShapeConfigServiceImpl();
 
     public static KeyBinding activationKey;
     public static KeyBinding configMenuKey;
 
     private final AtomicReference<ActivationStep> standStep = new AtomicReference<>();
     private final AtomicReference<ActivationStep> clickStep = new AtomicReference<>();
+    private final AtomicReference<ActivationStep> shapeStep = new AtomicReference<>();
 
     private BlockCounterModMenuConfig config;
+
+    private Direction.Axis lookAxis = null;
 
     private Vec3d firstPosition;
     private Vec3d secondPosition;
@@ -80,89 +86,204 @@ public class BlockCounterClient implements ClientModInitializer {
         // Handle activation key press
         standStep.set(ActivationStep.FINISHED);
         clickStep.set(ActivationStep.FINISHED);
+        shapeStep.set(ActivationStep.FINISHED);
 
-        // Handle Standing Activation Method
+        // Handle Activation Methods
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
 
             // Check for menu key
             while (configMenuKey.wasPressed()) {
-                client.setScreen(new LineConfigScreen(this.lineConfigService, client.currentScreen));
+                client.setScreen(new ShapeConfigScreen(this.shapeConfigService, client.currentScreen));
             }
 
+            // Check for activation
             while (activationKey.wasPressed()) {
                 assert client.player != null;
 
-                if (config.activationMethod.equals(ActivationMethod.STANDING)) {
-                    handleStanding(client.player);
-                } else {
-                    handleClickActivation(client.player);
-                }
+                handleActivation(client);
             }
 
-            if (client.world != null && client.player != null) {
-                boolean didClick = MinecraftClient.getInstance().mouse.wasRightButtonClicked();
+            // Check for right clicks (placements)
+            if (this.config.activationMethod.equals(ActivationMethod.CLICK)) {
 
-                if (didClick && didClick != this.didRightClick && config.activationMethod.equals(ActivationMethod.CLICK)) {
-                    PlayerEntity player = client.player;
-                    BlockHitResult hitResult = (BlockHitResult) player.raycast(5, 0f, true);
-                    handleClick(client.player, hitResult.getBlockPos());
+                if (client.world != null && client.player != null) {
+                    boolean didClick = MinecraftClient.getInstance().mouse.wasRightButtonClicked();
+
+                    if (didClick && didClick != this.didRightClick) {
+                        PlayerEntity player = client.player;
+                        BlockHitResult hitResult = (BlockHitResult) player.raycast(5, 0f, true);
+                        handleClick(client.player, hitResult.getBlockPos());
+                    }
+
+                    this.didRightClick = didClick;
                 }
 
-                this.didRightClick = didClick;
             }
-
         });
 
+        // Make sure we can't click any interactables during placements
         UseBlockCallback.EVENT.register((playerEntity, world, hand, blockHitResult) -> {
             if (this.config.activationMethod.equals(ActivationMethod.CLICK)) {
-                if (this.lineConfigService.canPlaceLine()) {
-                    if (this.clickStep.get().equals(ActivationStep.STARTED)) {
-                        return ActionResult.FAIL;
-                    } else if (this.clickStep.get().equals(ActivationStep.DURING) && this.secondPosition == null) {
-                        return ActionResult.FAIL;
+
+                if (this.shapeConfigService.getSelectedShape().equals(Shape.LINE)) {
+                    if (this.shapeConfigService.canPlaceLine()) {
+                        if (this.clickStep.get().equals(ActivationStep.STARTED)) {
+                            return ActionResult.FAIL;
+                        } else if (this.clickStep.get().equals(ActivationStep.DURING) && this.secondPosition == null) {
+                            return ActionResult.FAIL;
+                        }
                     } else {
-                        return ActionResult.PASS;
+                        if (!this.clickStep.get().equals(ActivationStep.FINISHED)) {
+                            return ActionResult.FAIL;
+                        }
                     }
                 } else {
-                    if (!this.clickStep.get().equals(ActivationStep.FINISHED)) {
+                    if (this.shapeStep.get().equals(ActivationStep.STARTED)) {
                         return ActionResult.FAIL;
-                    } else {
-                        return ActionResult.PASS;
                     }
                 }
-            } else {
-                return ActionResult.PASS;
             }
 
+            return ActionResult.PASS;
         });
 
         // Block rendering
-        WorldRenderEvents.AFTER_ENTITIES.register(context -> {
-            if (firstPosition != null) {
-
-                BlockPos lockPos = null;
-
-                if (this.lineConfigService.canPlaceLine()) {
-                    if (secondPosition != null) {
-                        lockPos = BlockPos.ofFloored(secondPosition);
-                    }
-                }
-
-                if (config.activationMethod.equals(ActivationMethod.STANDING)) {
-                    blockRenderingService.renderStandingSelection(
-                            context,
-                            firstPosition,
-                            lockPos);
-                } else {
-                    blockRenderingService.renderClickSelection(
-                            context,
-                            firstPosition,
-                            lockPos);
-                }
-            }
-        });
+        WorldRenderEvents.AFTER_ENTITIES.register(this::handleRender);
     }
 
+    private void handleRender(WorldRenderContext context) {
+        switch (this.shapeConfigService.getSelectedShape()) {
+            case LINE -> renderLine(context);
+            case QUAD -> renderQuad(context);
+            case CIRCLE -> renderCircle(context);
+            case SPHERE -> renderSphere(context);
+        }
+    }
+
+    private void renderLine(WorldRenderContext context) {
+        if (firstPosition != null) {
+
+            BlockPos lockPos = null;
+
+            if (this.shapeConfigService.canPlaceLine()) {
+                if (secondPosition != null) {
+                    lockPos = BlockPos.ofFloored(secondPosition);
+                }
+            }
+
+            if (this.config.activationMethod.equals(ActivationMethod.STANDING)) {
+                blockRenderingService.renderStandingSelection(
+                        context,
+                        firstPosition,
+                        lockPos);
+            } else {
+                blockRenderingService.renderClickSelection(
+                        context,
+                        firstPosition,
+                        lockPos);
+            }
+        }
+    }
+
+    private void renderQuad(WorldRenderContext context) {
+        if (shapeStep.get().equals(ActivationStep.STARTED)) {
+            blockRenderingService.renderQuad(context, null);
+        } else if (shapeStep.get().equals(ActivationStep.DURING)) {
+            blockRenderingService.renderQuad(context, BlockPos.ofFloored(firstPosition));
+        }
+    }
+
+    private void renderCircle(WorldRenderContext context) {
+        if (shapeStep.get().equals(ActivationStep.STARTED)) {
+            // only update look axis during the placement period
+            PlayerEntity player = MinecraftClient.getInstance().player;
+            this.lookAxis = player.isSneaking() ? BlockCalculations.findLargestAxisDiff(this.blockRenderingService.getCrosshairBlockPos(),
+                    new Vec3d(player.getPos().x, player.getPos().y - 1, player.getPos().z)) : null;
+
+            blockRenderingService.renderCircle(context, null, this.lookAxis);
+        } else if (shapeStep.get().equals(ActivationStep.DURING)) {
+            blockRenderingService.renderCircle(context, BlockPos.ofFloored(firstPosition), this.lookAxis);
+        }
+    }
+
+    private void renderSphere(WorldRenderContext context) {
+        if (shapeStep.get().equals(ActivationStep.STARTED)) {
+            blockRenderingService.renderSphere(context, null);
+        } else if (shapeStep.get().equals(ActivationStep.DURING)) {
+            blockRenderingService.renderSphere(context, BlockPos.ofFloored(firstPosition));
+        }
+    }
+
+    // When the activation key was pressed
+    private void handleActivation(MinecraftClient client) {
+        if (this.shapeConfigService.getSelectedShape().equals(Shape.LINE)) {
+            if (this.config.activationMethod.equals(ActivationMethod.STANDING)) {
+                handleStanding(client.player);
+            } else {
+                handleClickActivation(client.player);
+            }
+        } else {
+            this.handleShape(client.player);
+        }
+    }
+
+    // If they right clicked
+    private void handleClick(PlayerEntity player, BlockPos pos) {
+        if (this.shapeConfigService.getSelectedShape().equals(Shape.LINE)) {
+            this.handleLineClick(player, pos);
+        } else {
+            this.handleShapeClick(player, pos);
+        }
+    }
+
+    // If they are trying to place a shape, not a line
+    private void handleShape(PlayerEntity player) {
+        ActivationMethod activationMethod = this.config.activationMethod;
+
+        if (shapeStep.get().equals(ActivationStep.STARTED)) {
+
+            if (activationMethod.equals(ActivationMethod.CLICK)) {
+                shapeStep.set(ActivationStep.FINISHED);
+
+                player.sendMessage(Text.literal("Shape placement aborted.")
+                                .formatted(Random.chatColorToFormat(config.chatColor)),
+                        !config.msgDisplayLocation.equals(MessageDisplay.CHAT));
+
+                firstPosition = null;
+                lookAxis = null;
+            } else {
+                shapeStep.set(ActivationStep.DURING);
+
+                if (activationMethod.equals(ActivationMethod.STANDING)) {
+                    firstPosition = player.getPos().subtract(new Vec3d(0, 1, 0));
+                } else {
+                    firstPosition = blockRenderingService.getCrosshairBlockPos();
+                }
+
+                player.sendMessage(Text.literal("Activate again to destroy...")
+                                .formatted(Random.chatColorToFormat(config.chatColor)),
+                        !config.msgDisplayLocation.equals(MessageDisplay.CHAT));
+            }
+
+        } else if (shapeStep.get().equals(ActivationStep.DURING)) {
+            shapeStep.set(ActivationStep.FINISHED);
+            firstPosition = null;
+            lookAxis = null;
+        } else {
+            shapeStep.set(ActivationStep.STARTED);
+
+            String msg = activationMethod.equals(ActivationMethod.STANDING)
+                    ? "Activate again to place..."
+                    : "Right click to place...";
+
+            player.sendMessage(Text.literal(msg)
+                            .formatted(Random.chatColorToFormat(config.chatColor)),
+                    !config.msgDisplayLocation.equals(MessageDisplay.CHAT));
+
+        }
+    }
+
+    // Line, standing activation
     private void handleStanding(PlayerEntity player) {
         if (standStep.get().equals(ActivationStep.FINISHED)) {
 
@@ -179,7 +300,7 @@ public class BlockCounterClient implements ClientModInitializer {
 
             printSecond(player);
 
-            if (!this.lineConfigService.canPlaceLine()) {
+            if (!this.shapeConfigService.canPlaceLine()) {
                 firstPosition = null;
                 secondPosition = null;
 
@@ -195,13 +316,14 @@ public class BlockCounterClient implements ClientModInitializer {
         }
     }
 
+    // Line, click activation
     private void handleClickActivation(PlayerEntity player) {
         if (clickStep.get().equals(ActivationStep.FINISHED)) {
 
             player.sendMessage(
                     Text.literal("Right click first position...")
-                            .formatted(Random.chatColorToFormat(config.chatColor)),
-                    !config.msgDisplayLocation.equals(MessageDisplay.CHAT)
+                            .formatted(Random.chatColorToFormat(this.config.chatColor)),
+                    !this.config.msgDisplayLocation.equals(MessageDisplay.CHAT)
             );
 
             firstPosition = null;
@@ -213,8 +335,8 @@ public class BlockCounterClient implements ClientModInitializer {
 
             player.sendMessage(
                     Text.literal("Block count aborted.")
-                            .formatted(Random.chatColorToFormat(config.chatColor)),
-                    !config.msgDisplayLocation.equals(MessageDisplay.CHAT)
+                            .formatted(Random.chatColorToFormat(this.config.chatColor)),
+                    !this.config.msgDisplayLocation.equals(MessageDisplay.CHAT)
             );
 
             clickStep.set(ActivationStep.FINISHED);
@@ -229,8 +351,25 @@ public class BlockCounterClient implements ClientModInitializer {
         }
     }
 
-    private void handleClick(PlayerEntity player, BlockPos pos) {
+    // Right clicked with shape
+    private void handleShapeClick(PlayerEntity player, BlockPos pos) {
 
+        if (shapeStep.get().equals(ActivationStep.STARTED)) {
+            firstPosition = Vec3d.of(pos);
+            secondPosition = null;
+
+            shapeStep.set(ActivationStep.DURING);
+
+            player.sendMessage(
+                    Text.literal("Activate again to destroy...")
+                            .formatted(Random.chatColorToFormat(this.config.chatColor)),
+                    !this.config.msgDisplayLocation.equals(MessageDisplay.CHAT)
+            );
+        }
+    }
+
+    // Right clicked with line
+    private void handleLineClick(PlayerEntity player, BlockPos pos) {
         if (clickStep.get().equals(ActivationStep.STARTED)) {
             firstPosition = Vec3d.of(pos);
             secondPosition = null;
@@ -241,12 +380,12 @@ public class BlockCounterClient implements ClientModInitializer {
 
             player.sendMessage(
                     Text.literal("Right click second position...")
-                            .formatted(Random.chatColorToFormat(config.chatColor)),
-                    !config.msgDisplayLocation.equals(MessageDisplay.CHAT)
+                            .formatted(Random.chatColorToFormat(this.config.chatColor)),
+                    !this.config.msgDisplayLocation.equals(MessageDisplay.CHAT)
             );
 
         } else if (clickStep.get().equals(ActivationStep.DURING)) {
-            if (!this.lineConfigService.canPlaceLine()) {
+            if (!this.shapeConfigService.canPlaceLine()) {
                 secondPosition = Vec3d.of(pos);
 
                 printSecond(player);
@@ -264,10 +403,11 @@ public class BlockCounterClient implements ClientModInitializer {
         }
     }
 
+    // Print first line message
     private void printFirst(PlayerEntity player) {
 
-        if (config.showPosMessages) {
-            boolean simplify = config.simplifiedMessages;
+        if (this.config.showPosMessages) {
+            boolean simplify = this.config.simplifiedMessages;
 
             String first = Random.formatVec3d(firstPosition, "%,.2f");
 
@@ -276,17 +416,18 @@ public class BlockCounterClient implements ClientModInitializer {
 
             player.sendMessage(Text.literal(
                                     simplify ? String.format(firstPosShort, first) : String.format(firstPosLong, first))
-                            .formatted(Random.chatColorToFormat(config.chatColor)),
-                    !config.msgDisplayLocation.equals(MessageDisplay.CHAT)
+                            .formatted(Random.chatColorToFormat(this.config.chatColor)),
+                    !this.config.msgDisplayLocation.equals(MessageDisplay.CHAT)
             );
         }
     }
 
+    // Print second line message
     private void printSecond(PlayerEntity player) {
-        boolean simplify = config.simplifiedMessages;
-        boolean isClick = config.activationMethod.equals(ActivationMethod.CLICK);
+        boolean simplify = this.config.simplifiedMessages;
+        boolean isClick = this.config.activationMethod.equals(ActivationMethod.CLICK);
 
-        if (config.showPosMessages) {
+        if (this.config.showPosMessages) {
             String second = Random.formatVec3d(secondPosition, "%,.2f");
 
             String secondPosLong = "Second: %s";
@@ -294,14 +435,14 @@ public class BlockCounterClient implements ClientModInitializer {
 
             player.sendMessage(
                     Text.literal(simplify ? String.format(secondPosShort, second) : String.format(secondPosLong, second))
-                            .formatted(Random.chatColorToFormat(config.chatColor)),
-                    !config.msgDisplayLocation.equals(MessageDisplay.CHAT)
+                            .formatted(Random.chatColorToFormat(this.config.chatColor)),
+                    !this.config.msgDisplayLocation.equals(MessageDisplay.CHAT)
             );
         }
 
         int dist;
-        if (this.lineConfigService.isAxisAligned()) {
-            if (!this.lineConfigService.isTwoAxis()) {
+        if (this.shapeConfigService.isAxisAligned()) {
+            if (!this.shapeConfigService.isTwoAxis()) {
                 dist = BlockCalculations.calculateBlocksOne(firstPosition, secondPosition, isClick);
             } else {
                 dist = BlockCalculations.calculateBlocksTwo(firstPosition, secondPosition, isClick);
@@ -317,14 +458,14 @@ public class BlockCounterClient implements ClientModInitializer {
                 Text.literal((simplify ?
                                 String.format(distShort, dist)
                                 : String.format(distLong, dist, dist == 1 ? "block" : "blocks")))
-                        .formatted(Random.chatColorToFormat(config.chatColor)),
-                !config.msgDisplayLocation.equals(MessageDisplay.CHAT)
+                        .formatted(Random.chatColorToFormat(this.config.chatColor)),
+                !this.config.msgDisplayLocation.equals(MessageDisplay.CHAT)
         );
 
     }
 
-    public LineConfigService getLineConfigService() {
-        return this.lineConfigService;
+    public ShapeConfigService getShapeConfigService() {
+        return this.shapeConfigService;
     }
 
     public static BlockCounterClient getInstance() {
@@ -333,6 +474,20 @@ public class BlockCounterClient implements ClientModInitializer {
 
     public BlockCounterModMenuConfig getConfig() {
         return this.config;
+    }
+
+    public BlockRenderingService getBlockRenderingService() {
+        return this.blockRenderingService;
+    }
+
+    public void shapeChanged() {
+        this.firstPosition = null;
+        this.secondPosition = null;
+
+        this.clickStep.set(ActivationStep.FINISHED);
+        this.shapeStep.set(ActivationStep.FINISHED);
+
+        this.lookAxis = null;
     }
 
 }
