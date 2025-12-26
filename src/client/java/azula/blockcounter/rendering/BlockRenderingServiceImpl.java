@@ -1,7 +1,10 @@
 package azula.blockcounter.rendering;
 
+import azula.blockcounter.ActivationMethod;
 import azula.blockcounter.BlockCounterClient;
-import azula.blockcounter.config.shape.LineConfigService;
+import azula.blockcounter.config.BlockCounterModMenuConfig;
+import azula.blockcounter.config.shape.Shape;
+import azula.blockcounter.config.shape.ShapeConfigService;
 import azula.blockcounter.util.BlockCalculations;
 import azula.blockcounter.util.Random;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
@@ -14,15 +17,42 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.RaycastContext;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 
 public class BlockRenderingServiceImpl implements BlockRenderingService {
 
     private final RenderingService renderingService;
 
+    private final Map<String, ArrayList<Vec3d>> quadPosCache = new HashMap<>();
+    private final Map<String, Integer> quadBlockCount = new HashMap<>(); // total blocks
+    private final Map<String, Integer> quadRenderCount = new HashMap<>(); // total blocks if only counting rendered
+
+    private final Map<String, ArrayList<Vec3d>> circlePosCache = new HashMap<>();
+    private final Map<String, Integer> circleBlockCount = new HashMap<>();
+    private final Map<String, Integer> circleRenderCount = new HashMap<>();
+
+    private final Map<String, ArrayList<Vec3d>> spherePosCache = new HashMap<>();
+    private final Map<String, Integer> sphereBlockCount = new HashMap<>();
+    private final Map<String, Integer> sphereRenderCount = new HashMap<>();
+
+    private Vec3d lastRenderPos = null;
+
+    private Shape lastShape = null;
+    private Vec3d lastDims = null;
+    private Vec3d lastOffsets = null;
+    private Direction.Axis lastLookAxis = null;
+
+    private boolean needsRebuild = false;
+
     public BlockRenderingServiceImpl() {
         this.renderingService = new RenderingServiceImpl();
+    }
+
+    public void markForRebuild() {
+        this.needsRebuild = true;
     }
 
     public void renderStandingSelection(WorldRenderContext context, Vec3d firstPos, BlockPos lockPos) {
@@ -47,7 +77,6 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
     }
 
     public void renderClickSelection(WorldRenderContext context, Vec3d firstPos, BlockPos lockPos) {
-
         if (firstPos != null) {
             Vec3d secondPos = getCrosshairBlockPos();
 
@@ -59,10 +88,367 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
                 this.renderLine(context, firstPos, secondPos, true);
             }
         }
-
     }
 
-    private Vec3d getCrosshairBlockPos() {
+    @Override
+    public void renderQuad(WorldRenderContext context, BlockPos lockPos) {
+        ShapeConfigService shapeService = BlockCounterClient.getInstance().getShapeConfigService();
+        BlockCounterModMenuConfig config = BlockCounterClient.getInstance().getConfig();
+
+        Vec3d offset = new Vec3d(shapeService.getXOffset(), shapeService.getYOffset(), shapeService.getZOffset());
+
+        BlockPos renderBlockPos;
+
+        if (lockPos == null) {
+            if (config.activationMethod.equals(ActivationMethod.STANDING)) {
+                renderBlockPos = BlockPos.ofFloored(
+                        MinecraftClient.getInstance().player.getPos()
+                                .subtract(new Vec3d(0, 1, 0)));
+            } else {
+                Vec3d crosshairPos = getCrosshairBlockPos();
+                if (crosshairPos == null) return;
+                renderBlockPos = BlockPos.ofFloored(crosshairPos);
+            }
+        } else {
+            renderBlockPos = lockPos;
+        }
+
+        int[] dimensions = shapeService.getDimensions(); // w, l, h for quad
+
+        Vec3d dimensionVec = new Vec3d(dimensions[0], dimensions[1], dimensions[2]);
+
+        Vec3d renderPos = Vec3d.of(renderBlockPos).add(offset);
+
+        if (!renderPos.equals(this.lastRenderPos)
+                || !Shape.QUAD.equals(this.lastShape)
+                || !dimensionVec.equals(this.lastDims)
+                || !shapeService.getOffsets().equals(this.lastOffsets)
+                || this.needsRebuild) {
+            List<Vec3d> quadPos = this.getQuadPositions(dimensions);
+            List<Vec3d> renderQuadPos = quadPos.stream().map(p -> p.add(renderPos)).toList();
+
+            this.renderingService.rebuildBuffer(renderQuadPos, config.renderType, config.builderMode, context);
+            this.needsRebuild = false;
+        }
+
+        this.renderingService.render(context, config.renderType);
+
+        this.lastRenderPos = renderPos;
+        this.lastShape = Shape.QUAD;
+        this.lastDims = dimensionVec;
+        this.lastOffsets = shapeService.getOffsets();
+        this.lastLookAxis = null;
+    }
+
+    private String quadCacheKey(int[] dimensions) {
+        return dimensions[0] + ";" + dimensions[1] + ";" + dimensions[2];
+    }
+
+    private ArrayList<Vec3d> getQuadPositions(int[] dimensions) {
+
+        String quadKey = this.quadCacheKey(dimensions);
+
+        if (this.quadPosCache.containsKey(quadKey)) {
+            return this.quadPosCache.get(quadKey);
+        }
+
+        Vec3d origin = Vec3d.ZERO;
+
+        Vec3d toAddX = new Vec3d(1, 0, 0);
+        Vec3d toAddY = new Vec3d(0, 1, 0);
+        Vec3d toAddZ = new Vec3d(0, 0, 1);
+
+        Vec3d bottomY = new Vec3d(origin.x, origin.y, origin.z);
+        Vec3d topY = new Vec3d(origin.x, origin.y + dimensions[2] - 1, origin.z);
+
+        Vec3d frontX = new Vec3d(origin.x, origin.y + 1, origin.z);
+        Vec3d backX = new Vec3d(origin.x + dimensions[1] - 1, origin.y + 1, origin.z);
+
+        Vec3d leftZ = new Vec3d(origin.x + 1, origin.y + 1, origin.z);
+        Vec3d rightZ = new Vec3d(origin.x + 1, origin.y + 1, origin.z + dimensions[0] - 1);
+
+        ArrayList<Vec3d> toRender = new ArrayList<>();
+
+        // top and bottom
+        for (int z = 0; z < dimensions[0]; z++) {
+            for (int x = 0; x < dimensions[1]; x++) {
+
+                toRender.addAll(this.quadBlockAdd(dimensions[2], bottomY, topY));
+
+                bottomY = bottomY.add(toAddX);
+                topY = topY.add(toAddX);
+            }
+            bottomY = new Vec3d(origin.x, bottomY.y, bottomY.z);
+            bottomY = bottomY.add(toAddZ);
+            topY = new Vec3d(origin.x, topY.y, topY.z);
+            topY = topY.add(toAddZ);
+        }
+
+        // front and back
+        for (int y = 0; y < dimensions[2] - 2; y++) {
+            for (int z = 0; z < dimensions[0]; z++) {
+
+                toRender.addAll(this.quadBlockAdd(dimensions[1], frontX, backX));
+
+                frontX = frontX.add(toAddZ);
+                backX = backX.add(toAddZ);
+            }
+
+            frontX = new Vec3d(frontX.x, frontX.y, origin.z);
+            frontX = frontX.add(toAddY);
+            backX = new Vec3d(backX.x, backX.y, origin.z);
+            backX = backX.add(toAddY);
+        }
+
+        // left and right
+        for (int y = 0; y < dimensions[2] - 2; y++) {
+            for (int x = 0; x < dimensions[1] - 2; x++) {
+
+                toRender.addAll(this.quadBlockAdd(dimensions[0], leftZ, rightZ));
+
+                leftZ = leftZ.add(toAddX);
+                rightZ = rightZ.add(toAddX);
+            }
+
+            leftZ = new Vec3d(origin.x + 1, leftZ.y, leftZ.z);
+            leftZ = leftZ.add(toAddY);
+            rightZ = new Vec3d(origin.x + 1, rightZ.y, rightZ.z);
+            rightZ = rightZ.add(toAddY);
+        }
+
+        this.quadPosCache.put(quadKey, toRender);
+
+        return toRender;
+    }
+
+    private ArrayList<Vec3d> quadBlockAdd(int limiter, Vec3d defaultAdd, Vec3d pastLimitAdd) {
+        ArrayList<Vec3d> result = new ArrayList<>();
+
+        result.add(defaultAdd);
+        if (limiter > 1) result.add(pastLimitAdd);
+
+        return result;
+    }
+
+    @Override
+    public void renderCircle(WorldRenderContext context, BlockPos lockPos, Direction.Axis lookAxis) {
+        ShapeConfigService shapeService = BlockCounterClient.getInstance().getShapeConfigService();
+        BlockCounterModMenuConfig config = BlockCounterClient.getInstance().getConfig();
+
+        Vec3d offset = new Vec3d(shapeService.getXOffset(), shapeService.getYOffset(), shapeService.getZOffset());
+
+        BlockPos renderBlockPos;
+
+        if (lockPos == null) {
+            if (config.activationMethod.equals(ActivationMethod.STANDING)) {
+                renderBlockPos = BlockPos.ofFloored(
+                        MinecraftClient.getInstance().player.getPos()
+                                .subtract(new Vec3d(0, 1, 0)));
+            } else {
+                Vec3d crosshairPos = getCrosshairBlockPos();
+                if (crosshairPos == null) return;
+                renderBlockPos = BlockPos.ofFloored(crosshairPos);
+            }
+        } else {
+            renderBlockPos = lockPos;
+        }
+
+        int[] dimensions = shapeService.getDimensions(); // w, l, h for quad
+
+        Vec3d dimensionVec = new Vec3d(dimensions[0], dimensions[1], dimensions[2]);
+
+        Vec3d renderPos = Vec3d.of(renderBlockPos).add(offset);
+
+        if (!renderPos.equals(this.lastRenderPos)
+                || !Shape.CIRCLE.equals(this.lastShape)
+                || !dimensionVec.equals(this.lastDims)
+                || !shapeService.getOffsets().equals(this.lastOffsets)
+                || (lookAxis != null && !lookAxis.equals(this.lastLookAxis))
+                || (this.lastLookAxis != null && !this.lastLookAxis.equals(lookAxis))
+                || this.needsRebuild) {
+            List<Vec3d> circlePos = this.getCirclePositions(dimensions, lookAxis);
+            List<Vec3d> renderCirclePos = circlePos.stream().map(p -> p.add(renderPos)).toList();
+
+            this.renderingService.rebuildBuffer(renderCirclePos, config.renderType, config.builderMode, context);
+            this.needsRebuild = false;
+        }
+
+        this.renderingService.render(context, config.renderType);
+
+        this.lastRenderPos = renderPos;
+        this.lastShape = Shape.CIRCLE;
+        this.lastDims = dimensionVec;
+        this.lastOffsets = shapeService.getOffsets();
+        this.lastLookAxis = lookAxis;
+    }
+
+    private String circleCacheKey(int[] dimensions, Direction.Axis lockAxis) {
+        String axis = lockAxis != null ? lockAxis.getName() : "none";
+        return axis + ";" + dimensions[0] + ";" + dimensions[1] + ";" + dimensions[2];
+    }
+
+    private List<Vec3d> getCirclePositions(int[] dimensions, Direction.Axis lockAxis) {
+        String circleKey = this.circleCacheKey(dimensions, lockAxis);
+
+        if (this.circlePosCache.containsKey(circleKey)) {
+            return this.circlePosCache.get(circleKey);
+        }
+
+        int radius = dimensions[0];
+        int height = dimensions[1];
+
+        int rr = radius * radius;
+
+        // Random inefficient algorithm from stack overflow
+        // https://stackoverflow.com/questions/1201200/fast-algorithm-for-drawing-filled-circles
+
+        ArrayList<Vec3d> renderPoints = new ArrayList<>();
+
+        for (int x = -radius; x <= radius; x++) {
+            for (int z = -radius; z <= radius; z++) {
+                int xx = x * x;
+                int zz = z * z;
+
+                if (xx + zz < rr + radius) {
+                    Vec3d toAddBottom = new Vec3d(x, 0, z);
+                    if (lockAxis != null) {
+                        if (lockAxis.equals(Direction.Axis.X)) {
+                            toAddBottom = new Vec3d(0, z, x);
+                        } else if (lockAxis.equals(Direction.Axis.Z)){
+                            toAddBottom = new Vec3d(x, z, 0);
+                        }
+                    }
+
+                    renderPoints.add(toAddBottom);
+
+                    if (height > 1) {
+                        Vec3d toAddTop = new Vec3d(x, height - 1, z);
+                        if (lockAxis != null) {
+                            if (lockAxis.equals(Direction.Axis.X)) {
+                                toAddTop = new Vec3d(height - 1, z, x);
+                            } else if (lockAxis.equals(Direction.Axis.Z)){
+                                toAddTop = new Vec3d(x, z, height - 1);
+                            }
+                        }
+
+                        renderPoints.add(toAddTop);
+
+                        if (xx + zz > rr - radius) {
+                            for (int y = 1; y < height - 1; y++) {
+                                Vec3d toAddSides = new Vec3d(x, y, z);
+                                if (lockAxis != null) {
+                                    if (lockAxis.equals(Direction.Axis.X)) {
+                                        toAddSides = new Vec3d(y, z, x);
+                                    } else if (lockAxis.equals(Direction.Axis.Z)){
+                                        toAddSides = new Vec3d(x, z, y);
+                                    }
+                                }
+                                renderPoints.add(toAddSides);
+                            }
+                        }
+                    }
+
+                }
+            }
+        }
+
+        this.circlePosCache.put(circleKey, renderPoints);
+
+        return renderPoints;
+    }
+
+    @Override
+    public void renderSphere(WorldRenderContext context, BlockPos lockPos) {
+        ShapeConfigService shapeService = BlockCounterClient.getInstance().getShapeConfigService();
+        BlockCounterModMenuConfig config = BlockCounterClient.getInstance().getConfig();
+
+        Vec3d offset = new Vec3d(shapeService.getXOffset(), shapeService.getYOffset(), shapeService.getZOffset());
+
+        BlockPos renderBlockPos;
+
+        if (lockPos == null) {
+            if (config.activationMethod.equals(ActivationMethod.STANDING)) {
+                renderBlockPos = BlockPos.ofFloored(
+                        MinecraftClient.getInstance().player.getPos()
+                                .subtract(new Vec3d(0, 1, 0)));
+            } else {
+                Vec3d crosshairPos = getCrosshairBlockPos();
+                if (crosshairPos == null) return;
+                renderBlockPos = BlockPos.ofFloored(crosshairPos);
+            }
+        } else {
+            renderBlockPos = lockPos;
+        }
+
+        int[] dimensions = shapeService.getDimensions(); // w, l, h for quad
+
+        Vec3d dimensionVec = new Vec3d(dimensions[0], dimensions[1], dimensions[2]);
+
+        Vec3d renderPos = Vec3d.of(renderBlockPos).add(offset);
+
+        if (!renderPos.equals(this.lastRenderPos)
+                || !Shape.SPHERE.equals(this.lastShape)
+                || !dimensionVec.equals(this.lastDims)
+                || !shapeService.getOffsets().equals(this.lastOffsets)
+                || this.needsRebuild) {
+            List<Vec3d> spherePos = this.getSpherePositions(dimensions);
+            List<Vec3d> renderSpherePos = spherePos.stream().map(p -> p.add(renderPos)).toList();
+
+            this.renderingService.rebuildBuffer(renderSpherePos, config.renderType, config.builderMode, context);
+            this.needsRebuild = false;
+        }
+
+        this.renderingService.render(context, config.renderType);
+
+        this.lastRenderPos = renderPos;
+        this.lastShape = Shape.SPHERE;
+        this.lastDims = dimensionVec;
+        this.lastOffsets = shapeService.getOffsets();
+        this.lastLookAxis = null;
+    }
+
+    private String sphereCacheKey(int[] dimensions) {
+        return dimensions[0] + ";";
+    }
+
+    private List<Vec3d> getSpherePositions(int[] dimensions) {
+
+        String sphereKey = this.sphereCacheKey(dimensions);
+
+        if (this.spherePosCache.containsKey(sphereKey)) {
+            return this.spherePosCache.get(sphereKey);
+        }
+
+        int radius = dimensions[0];
+
+        ArrayList<Vec3d> renderPoints = new ArrayList<>();
+
+        int rr = radius * radius;
+
+        // Random inefficient algorithm from stack overflow
+        // https://stackoverflow.com/questions/1201200/fast-algorithm-for-drawing-filled-circles
+
+        for (int x = -radius; x <= radius; x++) {
+            for (int z = -radius; z <= radius; z++) {
+                for (int y = -radius; y <= radius; y++) {
+                    int xx = x * x;
+                    int yy = y * y;
+                    int zz = z * z;
+
+                    if ((xx + yy + zz < rr + radius) && (xx + yy + zz > rr - radius)) {
+                        renderPoints.add(new Vec3d(x, y, z));
+                    }
+                }
+            }
+        }
+
+        this.spherePosCache.put(sphereKey, renderPoints);
+
+        return renderPoints;
+    }
+
+    @Override
+    public Vec3d getCrosshairBlockPos() {
 
         MinecraftClient client = MinecraftClient.getInstance();
         ClientPlayerEntity player = MinecraftClient.getInstance().player;
@@ -96,9 +482,97 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
         return null;
     }
 
+    @Override
+    public Integer getTotalQuadCount(int[] dimensions) {
+        String quadKey = this.quadCacheKey(dimensions);
+
+        if (this.quadBlockCount.containsKey(quadKey)) {
+            return this.quadBlockCount.get(quadKey);
+        }
+
+        Integer count = BlockCalculations.calculateBlocksQuad(dimensions[0], dimensions[1], dimensions[2], false);
+        this.quadBlockCount.put(quadKey, count);
+
+        return count;
+    }
+
+    @Override
+    public Integer getRenderQuadCount(int[] dimensions) {
+        String quadKey = this.quadCacheKey(dimensions);
+
+        if (this.quadRenderCount.containsKey(quadKey)) {
+            return this.quadRenderCount.get(quadKey);
+        }
+
+        Integer count = BlockCalculations.calculateBlocksQuad(dimensions[0], dimensions[1], dimensions[2], true);
+        this.quadRenderCount.put(quadKey, count);
+
+        return count;
+    }
+
+    private String circleCountKey(int[] dimensions) {
+        return dimensions[0] + ";" + dimensions[1];
+    }
+
+    @Override
+    public Integer getTotalCircleCount(int[] dimensions) {
+       String circleKey = this.circleCountKey(dimensions);
+
+       if (this.circleBlockCount.containsKey(circleKey)) {
+           return this.circleBlockCount.get(circleKey);
+       }
+
+       Integer count = BlockCalculations.calculateBlocksCircle(dimensions[0], dimensions[1], false);
+       this.circleBlockCount.put(circleKey, count);
+
+       return count;
+    }
+
+    @Override
+    public Integer getRenderCircleCount(int[] dimensions) {
+        String circleKey = this.circleCountKey(dimensions);
+
+        if (this.circleRenderCount.containsKey(circleKey)) {
+            return this.circleRenderCount.get(circleKey);
+        }
+
+        Integer count = BlockCalculations.calculateBlocksCircle(dimensions[0], dimensions[1], true);
+        this.circleRenderCount.put(circleKey, count);
+
+        return count;
+    }
+
+    @Override
+    public Integer getTotalSphereCount(int[] dimensions) {
+        String sphereKey = this.sphereCacheKey(dimensions);
+
+        if (this.sphereBlockCount.containsKey(sphereKey)) {
+            return this.sphereBlockCount.get(sphereKey);
+        }
+
+        Integer count = BlockCalculations.calculateBlocksSphere(dimensions[0], false);
+        this.sphereBlockCount.put(sphereKey, count);
+
+        return count;
+    }
+
+    @Override
+    public Integer getRenderSphereCount(int[] dimensions) {
+        String sphereKey = this.sphereCacheKey(dimensions);
+
+        if (this.sphereRenderCount.containsKey(sphereKey)) {
+            return this.sphereRenderCount.get(sphereKey);
+        }
+
+        Integer count = BlockCalculations.calculateBlocksSphere(dimensions[0], true);
+        this.sphereRenderCount.put(sphereKey, count);
+
+        return count;
+    }
+
     private void renderLine(WorldRenderContext context, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
 
-        LineConfigService shapeService = BlockCounterClient.getInstance().getLineConfigService();
+        ShapeConfigService shapeService = BlockCounterClient.getInstance().getShapeConfigService();
 
         if (shapeService.isAxisAligned()) {
 
@@ -116,7 +590,7 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
 
     private void renderSingleLine(WorldRenderContext context, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
 
-        LineConfigService service = BlockCounterClient.getInstance().getLineConfigService();
+        ShapeConfigService service = BlockCounterClient.getInstance().getShapeConfigService();
         Vec3d offset = new Vec3d(service.getXOffset(), service.getYOffset(), service.getZOffset());
 
         Vec3d firstPosInt = Random.toIntVec(firstPos).add(offset);
@@ -165,52 +639,28 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
         Vec3d toAdd = (dir.equals(Direction.Axis.X) ? new Vec3d(1, 0, 0) :
                 (dir.equals(Direction.Axis.Y) ? new Vec3d(0, 1, 0) : new Vec3d(0, 0, 1)));
 
-        // start the necessary vertex buffer
-        switch (BlockCounterClient.getInstance().getConfig().renderType) {
-            case SOLID -> {
-                this.renderingService.startQuadBuffer();
+        List<Vec3d> line = new ArrayList<>();
 
-                for (int b = 0; b < stopIndex; b++) {
-                    this.renderingService.addSolid(context, renderPos);
-                    renderPos = renderPos.add(toAdd);
-                }
-
-                this.renderingService.renderQuadBuffer(context);
-            }
-            case EDGE_ONLY -> {
-                this.renderingService.startLineBuffer();
-
-                for (int b = 0; b < stopIndex; b++) {
-                    this.renderingService.addEdged(context, renderPos);
-                    renderPos = renderPos.add(toAdd);
-                }
-
-                this.renderingService.renderLineBuffer(context);
-            }
-            case SOLID_EDGE -> {
-                this.renderingService.startQuadBuffer();
-
-                Vec3d start = new Vec3d(renderPos.x, renderPos.y, renderPos.z);
-
-                for (int b = 0; b < stopIndex; b++) {
-                    this.renderingService.addSolid(context, renderPos);
-                    renderPos = renderPos.add(toAdd);
-                }
-
-                this.renderingService.renderQuadBuffer(context);
-
-                renderPos = new Vec3d(start.x, start.y, start.z);
-
-                this.renderingService.startLineBuffer();
-
-                for (int b = 0; b < stopIndex; b++) {
-                    this.renderingService.addEdged(context, renderPos);
-                    renderPos = renderPos.add(toAdd);
-                }
-
-                this.renderingService.renderLineBuffer(context);
-            }
+        for (int b = 0; b < stopIndex; b++) {
+            line.add(renderPos);
+            renderPos = renderPos.add(toAdd);
         }
+
+        if (!secondPos.equals(this.lastRenderPos)
+                || !Shape.LINE.equals(this.lastShape)
+                || !BlockCounterClient.getInstance().getShapeConfigService().getOffsets().equals(this.lastOffsets)
+                || this.needsRebuild) {
+            BlockCounterModMenuConfig config = BlockCounterClient.getInstance().getConfig();
+            this.renderingService.rebuildBuffer(line, config.renderType, config.builderMode, context);
+            this.needsRebuild = false;
+        }
+
+        this.renderingService.render(context, BlockCounterClient.getInstance().getConfig().renderType);
+
+        this.lastRenderPos = secondPos;
+        this.lastShape = Shape.LINE;
+        this.lastDims = null;
+        this.lastOffsets = BlockCounterClient.getInstance().getShapeConfigService().getOffsets();
     }
 
     private void renderDoubleLine(WorldRenderContext context, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
@@ -253,7 +703,7 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
     // 3D Line Drawing algorithm with slight tweaks
     // https://www.geeksforgeeks.org/bresenhams-algorithm-for-3-d-line-drawing/
     private void renderFreeLine(WorldRenderContext context, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
-        LineConfigService service = BlockCounterClient.getInstance().getLineConfigService();
+        ShapeConfigService service = BlockCounterClient.getInstance().getShapeConfigService();
         Vec3d offset = new Vec3d(service.getXOffset(), service.getYOffset(), service.getZOffset());
 
         Vec3d firstPosInt = Random.toIntVec(firstPos).add(offset);
@@ -337,36 +787,21 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
             }
         }
 
-        // create the necessary vertex buffer
-        switch (BlockCounterClient.getInstance().getConfig().renderType) {
-            case SOLID -> {
-                this.renderingService.startQuadBuffer();
-
-                renderPoints.forEach(p -> this.renderingService.addSolid(context, p));
-
-                this.renderingService.renderQuadBuffer(context);
-            }
-            case EDGE_ONLY -> {
-                this.renderingService.startLineBuffer();
-
-                renderPoints.forEach(p -> this.renderingService.addEdged(context, p));
-
-                this.renderingService.renderLineBuffer(context);
-            }
-            case SOLID_EDGE -> {
-                this.renderingService.startQuadBuffer();
-
-                renderPoints.forEach(p -> this.renderingService.addSolid(context, p));
-
-                this.renderingService.renderQuadBuffer(context);
-
-                this.renderingService.startLineBuffer();
-
-                renderPoints.forEach(p -> this.renderingService.addEdged(context, p));
-
-                this.renderingService.renderLineBuffer(context);
-            }
+        if (!secondPos.equals(this.lastRenderPos)
+                || !Shape.LINE.equals(this.lastShape)
+                || !BlockCounterClient.getInstance().getShapeConfigService().getOffsets().equals(this.lastOffsets)
+                || this.needsRebuild) {
+            BlockCounterModMenuConfig config = BlockCounterClient.getInstance().getConfig();
+            this.renderingService.rebuildBuffer(renderPoints, config.renderType, config.builderMode, context);
+            this.needsRebuild = false;
         }
+
+        this.renderingService.render(context, BlockCounterClient.getInstance().getConfig().renderType);
+
+        this.lastRenderPos = secondPos;
+        this.lastShape = Shape.LINE;
+        this.lastDims = null;
+        this.lastOffsets = BlockCounterClient.getInstance().getShapeConfigService().getOffsets();
     }
 
     private Vec3d findDimensions(Vec3d firstPos, Vec3d secondPos) {
