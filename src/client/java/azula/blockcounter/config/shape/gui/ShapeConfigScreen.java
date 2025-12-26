@@ -28,8 +28,8 @@ public class ShapeConfigScreen extends Screen {
     private final int padding = 10;
     private final int ySpacing = 20;
 
-    private final int configWidth = 104;
-    private final int configHeight = 250;
+    private final int configWidth = 176;
+    private final int configHeight = 247;
 
     private int yStart;
 
@@ -242,7 +242,7 @@ public class ShapeConfigScreen extends Screen {
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
 
-//        this.renderBackground(context, BACKGROUND_TEXTURE);
+        this.renderBackground(context, BACKGROUND_TEXTURE);
 
         this.shapeButton.setMessage(Text.of(this.configService.getSelectedShape().toString()));
 
@@ -315,35 +315,39 @@ public class ShapeConfigScreen extends Screen {
 
         if (!isLine) {
 
-            Integer totalCount;
-            Integer renderCount;
+            Integer total;
+            Integer render;
+
             switch (configService.getSelectedShape()) {
                 case QUAD -> {
-                    totalCount = BlockCounterClient.getInstance().getBlockRenderingService().getTotalQuadCount(configService.getDimensions());
-                    renderCount = BlockCounterClient.getInstance().getBlockRenderingService().getRenderQuadCount(configService.getDimensions());
+                    total = BlockCounterClient.getInstance().getBlockRenderingService().getTotalQuadCount(configService.getDimensions());
+                    render = BlockCounterClient.getInstance().getBlockRenderingService().getRenderQuadCount(configService.getDimensions());
                 }
                 case CIRCLE -> {
-                    totalCount = BlockCounterClient.getInstance().getBlockRenderingService().getTotalCircleCount(configService.getDimensions());
-                    renderCount = BlockCounterClient.getInstance().getBlockRenderingService().getRenderCircleCount(configService.getDimensions());
+                    total = BlockCounterClient.getInstance().getBlockRenderingService().getTotalCircleCount(configService.getDimensions());
+                    render = BlockCounterClient.getInstance().getBlockRenderingService().getRenderCircleCount(configService.getDimensions());
                 }
                 case SPHERE -> {
-                    totalCount = BlockCounterClient.getInstance().getBlockRenderingService().getTotalSphereCount(configService.getDimensions());
-                    renderCount = BlockCounterClient.getInstance().getBlockRenderingService().getRenderSphereCount(configService.getDimensions());
+                    total = BlockCounterClient.getInstance().getBlockRenderingService().getTotalSphereCount(configService.getDimensions());
+                    render = BlockCounterClient.getInstance().getBlockRenderingService().getRenderSphereCount(configService.getDimensions());
                 }
                 default -> {
-                    totalCount = 0;
-                    renderCount = 0;
+                    total = 0;
+                    render = 0;
                 }
             }
 
-            context.drawText(this.textRenderer, "Total: " + totalCount + (totalCount == 1 ? " block" : " blocks"),
+            String totalCount = this.formatCount(total);
+            String renderCount = this.formatCount(render);
+
+            context.drawText(this.textRenderer, "Total: " + totalCount,
                     (this.width - this.configWidth) / 2 + padding,
                     yStart + ySpacing + textRenderer.fontHeight,
                     0xFFFFFFFF,
                     true
             );
 
-            context.drawText(this.textRenderer, "Shown: " + renderCount + (renderCount == 1 ? " block" : " blocks"),
+            context.drawText(this.textRenderer, "Shown: " + renderCount,
                     (this.width - this.configWidth) / 2 + padding,
                     yStart + 2 * ySpacing,
                     0xFFFFFFFF,
@@ -369,6 +373,29 @@ public class ShapeConfigScreen extends Screen {
 
     }
 
+    private String formatCount(Integer count) {
+        if (count == 1) {
+            return count + " block";
+        } else {
+            int stackCount = (count / 64);
+
+            if (stackCount == 0) {
+                return count + " blocks";
+            }
+
+            String result = stackCount + "x64";
+
+            int rem = (count % 64);
+            if (rem != 0) {
+                result += " + " + rem;
+            }
+
+            result += " blocks";
+
+            return result;
+        }
+    }
+
     // It seems like overriding this method eliminates the setting of
     // shouldCloseOnEscape
     @Override
@@ -391,7 +418,7 @@ public class ShapeConfigScreen extends Screen {
 
         matrices.push();
         context.drawTexture(RenderLayer::getGuiTextured, background, (width - configWidth) / 2, (height - configHeight) / 2,
-                0, 0, configWidth, configHeight, 256, 256);
+                0, 0, configWidth, configHeight, 256, 512);
         matrices.pop();
 
         RenderSystem.disableBlend();

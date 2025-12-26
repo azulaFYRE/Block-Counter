@@ -37,7 +37,7 @@ public class BlockCounterModMenuConfig implements ConfigData {
     public RenderType renderType = RenderType.SOLID;
 
     @ConfigEntry.Category("Customization")
-    @ConfigEntry.Gui.Tooltip(count = 2)
+    @ConfigEntry.Gui.Tooltip
     public boolean builderMode = false;
 
     @ConfigEntry.Category("Customization")
