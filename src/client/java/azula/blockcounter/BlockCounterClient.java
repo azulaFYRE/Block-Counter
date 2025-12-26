@@ -69,6 +69,12 @@ public class BlockCounterClient implements ClientModInitializer {
         // Load config
         this.config = configHolder.getConfig();
 
+        // Rebuild buffers if we change settings
+        configHolder.registerSaveListener((holder, config) -> {
+            this.blockRenderingService.markForRebuild();
+            return ActionResult.SUCCESS;
+        });
+
         // Grab activation keyBinding
         activationKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "text.autoconfig.blockcounter.option.activationKey",

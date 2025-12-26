@@ -10,6 +10,6 @@ import java.util.List;
 public interface RenderingService {
 
     void setRenderColors(BlockCounterModMenuConfig config);
-    void rebuildBuffer(List<Vec3d> pos, RenderType renderType, WorldRenderContext context);
+    void rebuildBuffer(List<Vec3d> pos, RenderType renderType, boolean builderMode, WorldRenderContext context);
     void render(WorldRenderContext context, RenderType type);
 }

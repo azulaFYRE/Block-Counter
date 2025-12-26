@@ -45,8 +45,14 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
     private Vec3d lastOffsets = null;
     private Direction.Axis lastLookAxis = null;
 
+    private boolean needsRebuild = false;
+
     public BlockRenderingServiceImpl() {
         this.renderingService = new RenderingServiceImpl();
+    }
+
+    public void markForRebuild() {
+        this.needsRebuild = true;
     }
 
     public void renderStandingSelection(WorldRenderContext context, Vec3d firstPos, BlockPos lockPos) {
@@ -116,11 +122,13 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
         if (!renderPos.equals(this.lastRenderPos)
                 || !Shape.QUAD.equals(this.lastShape)
                 || !dimensionVec.equals(this.lastDims)
-                || !shapeService.getOffsets().equals(this.lastOffsets)) {
+                || !shapeService.getOffsets().equals(this.lastOffsets)
+                || this.needsRebuild) {
             List<Vec3d> quadPos = this.getQuadPositions(dimensions);
             List<Vec3d> renderQuadPos = quadPos.stream().map(p -> p.add(renderPos)).toList();
 
-            this.renderingService.rebuildBuffer(renderQuadPos, config.renderType, context);
+            this.renderingService.rebuildBuffer(renderQuadPos, config.renderType, config.builderMode, context);
+            this.needsRebuild = false;
         }
 
         this.renderingService.render(context, config.renderType);
@@ -256,11 +264,13 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
                 || !dimensionVec.equals(this.lastDims)
                 || !shapeService.getOffsets().equals(this.lastOffsets)
                 || (lookAxis != null && !lookAxis.equals(this.lastLookAxis))
-                || (this.lastLookAxis != null && !this.lastLookAxis.equals(lookAxis))) {
+                || (this.lastLookAxis != null && !this.lastLookAxis.equals(lookAxis))
+                || this.needsRebuild) {
             List<Vec3d> circlePos = this.getCirclePositions(dimensions, lookAxis);
             List<Vec3d> renderCirclePos = circlePos.stream().map(p -> p.add(renderPos)).toList();
 
-            this.renderingService.rebuildBuffer(renderCirclePos, config.renderType, context);
+            this.renderingService.rebuildBuffer(renderCirclePos, config.renderType, config.builderMode, context);
+            this.needsRebuild = false;
         }
 
         this.renderingService.render(context, config.renderType);
@@ -379,11 +389,13 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
         if (!renderPos.equals(this.lastRenderPos)
                 || !Shape.SPHERE.equals(this.lastShape)
                 || !dimensionVec.equals(this.lastDims)
-                || !shapeService.getOffsets().equals(this.lastOffsets)) {
+                || !shapeService.getOffsets().equals(this.lastOffsets)
+                || this.needsRebuild) {
             List<Vec3d> spherePos = this.getSpherePositions(dimensions);
             List<Vec3d> renderSpherePos = spherePos.stream().map(p -> p.add(renderPos)).toList();
 
-            this.renderingService.rebuildBuffer(renderSpherePos, config.renderType, context);
+            this.renderingService.rebuildBuffer(renderSpherePos, config.renderType, config.builderMode, context);
+            this.needsRebuild = false;
         }
 
         this.renderingService.render(context, config.renderType);
@@ -498,6 +510,66 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
         return count;
     }
 
+    private String circleCountKey(int[] dimensions) {
+        return dimensions[0] + ";" + dimensions[1];
+    }
+
+    @Override
+    public Integer getTotalCircleCount(int[] dimensions) {
+       String circleKey = this.circleCountKey(dimensions);
+
+       if (this.circleBlockCount.containsKey(circleKey)) {
+           return this.circleBlockCount.get(circleKey);
+       }
+
+       Integer count = BlockCalculations.calculateBlocksCircle(dimensions[0], dimensions[1], false);
+       this.circleBlockCount.put(circleKey, count);
+
+       return count;
+    }
+
+    @Override
+    public Integer getRenderCircleCount(int[] dimensions) {
+        String circleKey = this.circleCountKey(dimensions);
+
+        if (this.circleRenderCount.containsKey(circleKey)) {
+            return this.circleRenderCount.get(circleKey);
+        }
+
+        Integer count = BlockCalculations.calculateBlocksCircle(dimensions[0], dimensions[1], true);
+        this.circleRenderCount.put(circleKey, count);
+
+        return count;
+    }
+
+    @Override
+    public Integer getTotalSphereCount(int[] dimensions) {
+        String sphereKey = this.sphereCacheKey(dimensions);
+
+        if (this.sphereBlockCount.containsKey(sphereKey)) {
+            return this.sphereBlockCount.get(sphereKey);
+        }
+
+        Integer count = BlockCalculations.calculateBlocksSphere(dimensions[0], false);
+        this.sphereBlockCount.put(sphereKey, count);
+
+        return count;
+    }
+
+    @Override
+    public Integer getRenderSphereCount(int[] dimensions) {
+        String sphereKey = this.sphereCacheKey(dimensions);
+
+        if (this.sphereRenderCount.containsKey(sphereKey)) {
+            return this.sphereRenderCount.get(sphereKey);
+        }
+
+        Integer count = BlockCalculations.calculateBlocksSphere(dimensions[0], true);
+        this.sphereRenderCount.put(sphereKey, count);
+
+        return count;
+    }
+
     private void renderLine(WorldRenderContext context, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
 
         ShapeConfigService shapeService = BlockCounterClient.getInstance().getShapeConfigService();
@@ -576,8 +648,11 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
 
         if (!secondPos.equals(this.lastRenderPos)
                 || !Shape.LINE.equals(this.lastShape)
-                || !BlockCounterClient.getInstance().getShapeConfigService().getOffsets().equals(this.lastOffsets)) {
-            this.renderingService.rebuildBuffer(line, BlockCounterClient.getInstance().getConfig().renderType, context);
+                || !BlockCounterClient.getInstance().getShapeConfigService().getOffsets().equals(this.lastOffsets)
+                || this.needsRebuild) {
+            BlockCounterModMenuConfig config = BlockCounterClient.getInstance().getConfig();
+            this.renderingService.rebuildBuffer(line, config.renderType, config.builderMode, context);
+            this.needsRebuild = false;
         }
 
         this.renderingService.render(context, BlockCounterClient.getInstance().getConfig().renderType);
@@ -714,8 +789,11 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
 
         if (!secondPos.equals(this.lastRenderPos)
                 || !Shape.LINE.equals(this.lastShape)
-                || !BlockCounterClient.getInstance().getShapeConfigService().getOffsets().equals(this.lastOffsets)) {
-            this.renderingService.rebuildBuffer(renderPoints, BlockCounterClient.getInstance().getConfig().renderType, context);
+                || !BlockCounterClient.getInstance().getShapeConfigService().getOffsets().equals(this.lastOffsets)
+                || this.needsRebuild) {
+            BlockCounterModMenuConfig config = BlockCounterClient.getInstance().getConfig();
+            this.renderingService.rebuildBuffer(renderPoints, config.renderType, config.builderMode, context);
+            this.needsRebuild = false;
         }
 
         this.renderingService.render(context, BlockCounterClient.getInstance().getConfig().renderType);

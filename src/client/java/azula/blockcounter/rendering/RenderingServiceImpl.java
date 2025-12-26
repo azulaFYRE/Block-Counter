@@ -47,31 +47,31 @@ public class RenderingServiceImpl implements RenderingService {
     }
 
     @Override
-    public void rebuildBuffer(List<Vec3d> pos, RenderType renderType, WorldRenderContext context) {
+    public void rebuildBuffer(List<Vec3d> pos, RenderType renderType, boolean builderMode, WorldRenderContext context) {
 
         switch (renderType) {
-            case SOLID -> this.rebuildQuadBuffer(pos, context);
-            case EDGE_ONLY -> this.rebuildLineBuffer(pos, context);
+            case SOLID -> this.rebuildQuadBuffer(pos, context, builderMode);
+            case EDGE_ONLY -> this.rebuildLineBuffer(pos, context, builderMode);
             case SOLID_EDGE -> {
-                this.rebuildQuadBuffer(pos, context);
-                this.rebuildLineBuffer(pos, context);
+                this.rebuildQuadBuffer(pos, context, builderMode);
+                this.rebuildLineBuffer(pos, context, builderMode);
             }
         }
     }
 
-    private void rebuildQuadBuffer(List<Vec3d> pos, WorldRenderContext context) {
+    private void rebuildQuadBuffer(List<Vec3d> pos, WorldRenderContext context, boolean builderMode) {
         this.startQuadBuffer();
 
-        pos.forEach(p -> this.addSolid(context, p));
+        pos.forEach(p -> this.addSolid(context, p, builderMode));
 
         this.quadVertBuffer.bind();
         this.quadVertBuffer.upload(this.quadBuffer.end());
     }
 
-    private void rebuildLineBuffer(List<Vec3d> pos, WorldRenderContext context) {
+    private void rebuildLineBuffer(List<Vec3d> pos, WorldRenderContext context, boolean builderMode) {
         this.startLineBuffer();
 
-        pos.forEach(p -> this.addEdged(context, p));
+        pos.forEach(p -> this.addEdged(context, p, builderMode));
 
         this.lineVertBuffer.bind();
         this.lineVertBuffer.upload(this.lineBuffer.end());
@@ -91,38 +91,50 @@ public class RenderingServiceImpl implements RenderingService {
         this.quadVertBuffer = new VertexBuffer(GlUsage.STATIC_WRITE);
     }
 
-    private void addSolid(WorldRenderContext context, Vec3d pos) {
-
+    private void addSolid(WorldRenderContext context, Vec3d pos, boolean builderMode) {
         if (context.matrixStack() != null) {
-
-            Vec3d cameraPos = context.camera().getPos();
-            Vector3f posInCam = pos.toVector3f().sub(cameraPos.toVector3f());
-
-            this.addSolidBlockToBuffer(pos.toVector3f());
-        }
-
-    }
-
-    private void addEdged(WorldRenderContext context, Vec3d pos) {
-        if (context.matrixStack() != null) {
-
-            Vec3d cameraPos = context.camera().getPos();
-            Vector3f posInCam = pos.toVector3f().sub(cameraPos.toVector3f());
-
-            this.addEdgedBlockToBuffer(pos.toVector3f());
+            this.addSolidBlockToBuffer(pos.toVector3f(), builderMode);
         }
     }
 
-    private void addSolidBlockToBuffer(Vector3f pos) {
-        Vector3f back_bl = new Vector3f(pos.x, pos.y, pos.z);
-        Vector3f back_tl = new Vector3f(pos.x, pos.y + 1, pos.z);
-        Vector3f back_tr = new Vector3f(pos.x + 1, pos.y + 1, pos.z);
-        Vector3f back_br = new Vector3f(pos.x + 1, pos.y, pos.z);
+    private void addEdged(WorldRenderContext context, Vec3d pos, boolean builderMode) {
+        if (context.matrixStack() != null) {
+            this.addEdgedBlockToBuffer(pos.toVector3f(), builderMode);
+        }
+    }
 
-        Vector3f front_bl = new Vector3f(pos.x, pos.y, pos.z + 1);
-        Vector3f front_tl = new Vector3f(pos.x, pos.y + 1, pos.z + 1);
-        Vector3f front_tr = new Vector3f(pos.x + 1, pos.y + 1, pos.z + 1);
-        Vector3f front_br = new Vector3f(pos.x + 1, pos.y, pos.z + 1);
+    private void addSolidBlockToBuffer(Vector3f pos, boolean builderMode) {
+        Vector3f back_bl;
+        Vector3f back_tl;
+        Vector3f back_tr;
+        Vector3f back_br;
+
+        Vector3f front_bl;
+        Vector3f front_tl;
+        Vector3f front_tr;
+        Vector3f front_br;
+
+        if (!builderMode) {
+            back_bl = new Vector3f(pos.x, pos.y, pos.z);
+            back_tl = new Vector3f(pos.x, pos.y + 1, pos.z);
+            back_tr = new Vector3f(pos.x + 1, pos.y + 1, pos.z);
+            back_br = new Vector3f(pos.x + 1, pos.y, pos.z);
+
+            front_bl = new Vector3f(pos.x, pos.y, pos.z + 1);
+            front_tl = new Vector3f(pos.x, pos.y + 1, pos.z + 1);
+            front_tr = new Vector3f(pos.x + 1, pos.y + 1, pos.z + 1);
+            front_br = new Vector3f(pos.x + 1, pos.y, pos.z + 1);
+        } else {
+            back_bl = new Vector3f(pos.x + 0.33f, pos.y + 0.33f, pos.z + 0.33f);
+            back_tl = new Vector3f(pos.x + 0.33f, pos.y + 0.66f, pos.z + 0.33f);
+            back_tr = new Vector3f(pos.x + 0.66f, pos.y + 0.66f, pos.z + 0.33f);
+            back_br = new Vector3f(pos.x + 0.66f, pos.y + 0.33f, pos.z + 0.33f);
+
+            front_bl = new Vector3f(pos.x + 0.33f, pos.y + 0.33f, pos.z + 0.66f);
+            front_tl = new Vector3f(pos.x + 0.33f, pos.y + 0.66f, pos.z + 0.66f);
+            front_tr = new Vector3f(pos.x + 0.66f, pos.y + 0.66f, pos.z + 0.66f);
+            front_br = new Vector3f(pos.x + 0.66f, pos.y + 0.33f, pos.z + 0.66f);
+        }
 
         // back face
         this.quadBuffer.vertex(back_br.x, back_br.y, back_br.z).color(this.renderColor.getRGB());
@@ -161,16 +173,38 @@ public class RenderingServiceImpl implements RenderingService {
         this.quadBuffer.vertex(front_bl.x, front_bl.y, front_bl.z).color(this.renderColor.getRGB());
     }
 
-    private void addEdgedBlockToBuffer(Vector3f pos) {
-        Vector3f back_bl = new Vector3f(pos.x, pos.y, pos.z);
-        Vector3f back_tl = new Vector3f(pos.x, pos.y + 1, pos.z);
-        Vector3f back_tr = new Vector3f(pos.x + 1, pos.y + 1, pos.z);
-        Vector3f back_br = new Vector3f(pos.x + 1, pos.y, pos.z);
+    private void addEdgedBlockToBuffer(Vector3f pos, boolean builderMode) {
+        Vector3f back_bl;
+        Vector3f back_tl;
+        Vector3f back_tr;
+        Vector3f back_br;
 
-        Vector3f front_bl = new Vector3f(pos.x, pos.y, pos.z + 1);
-        Vector3f front_tl = new Vector3f(pos.x, pos.y + 1, pos.z + 1);
-        Vector3f front_tr = new Vector3f(pos.x + 1, pos.y + 1, pos.z + 1);
-        Vector3f front_br = new Vector3f(pos.x + 1, pos.y, pos.z + 1);
+        Vector3f front_bl;
+        Vector3f front_tl;
+        Vector3f front_tr;
+        Vector3f front_br;
+
+        if (!builderMode) {
+            back_bl = new Vector3f(pos.x, pos.y, pos.z);
+            back_tl = new Vector3f(pos.x, pos.y + 1, pos.z);
+            back_tr = new Vector3f(pos.x + 1, pos.y + 1, pos.z);
+            back_br = new Vector3f(pos.x + 1, pos.y, pos.z);
+
+            front_bl = new Vector3f(pos.x, pos.y, pos.z + 1);
+            front_tl = new Vector3f(pos.x, pos.y + 1, pos.z + 1);
+            front_tr = new Vector3f(pos.x + 1, pos.y + 1, pos.z + 1);
+            front_br = new Vector3f(pos.x + 1, pos.y, pos.z + 1);
+        } else {
+            back_bl = new Vector3f(pos.x + 0.33f, pos.y + 0.33f, pos.z + 0.33f);
+            back_tl = new Vector3f(pos.x + 0.33f, pos.y + 0.66f, pos.z + 0.33f);
+            back_tr = new Vector3f(pos.x + 0.66f, pos.y + 0.66f, pos.z + 0.33f);
+            back_br = new Vector3f(pos.x + 0.66f, pos.y + 0.33f, pos.z + 0.33f);
+
+            front_bl = new Vector3f(pos.x + 0.33f, pos.y + 0.33f, pos.z + 0.66f);
+            front_tl = new Vector3f(pos.x + 0.33f, pos.y + 0.66f, pos.z + 0.66f);
+            front_tr = new Vector3f(pos.x + 0.66f, pos.y + 0.66f, pos.z + 0.66f);
+            front_br = new Vector3f(pos.x + 0.66f, pos.y + 0.33f, pos.z + 0.66f);
+        }
 
         // back bottom
         this.lineBuffer.vertex(back_br.x, back_br.y, back_br.z).color(this.edgeColor.getRGB());

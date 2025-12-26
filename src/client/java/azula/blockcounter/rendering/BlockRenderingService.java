@@ -7,6 +7,8 @@ import net.minecraft.util.math.Vec3d;
 
 public interface BlockRenderingService {
 
+    void markForRebuild();
+
     void renderStandingSelection(WorldRenderContext context, Vec3d firstPos, BlockPos lockPos);
 
     void renderClickSelection(WorldRenderContext context, Vec3d firstPos, BlockPos lockPos);
@@ -22,4 +24,12 @@ public interface BlockRenderingService {
     Integer getTotalQuadCount(int[] dimensions);
 
     Integer getRenderQuadCount(int[] dimensions);
+
+    Integer getTotalCircleCount(int[] dimensions);
+
+    Integer getRenderCircleCount(int[] dimensions);
+
+    Integer getTotalSphereCount(int[] dimensions);
+
+    Integer getRenderSphereCount(int[] dimensions);
 }

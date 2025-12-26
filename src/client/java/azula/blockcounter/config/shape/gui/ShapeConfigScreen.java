@@ -29,7 +29,7 @@ public class ShapeConfigScreen extends Screen {
     private final int ySpacing = 20;
 
     private final int configWidth = 104;
-    private final int configHeight = 169;
+    private final int configHeight = 250;
 
     private int yStart;
 
@@ -64,7 +64,7 @@ public class ShapeConfigScreen extends Screen {
 
         this.clearChildren();
 
-        yStart = (this.height - this.configHeight) / 3 + padding;
+        yStart = (this.height - this.configHeight) / 2 + padding;
 
         int buttonWidth = configWidth - 2 * padding;
         int buttonHeight = 2 * padding;
@@ -110,82 +110,82 @@ public class ShapeConfigScreen extends Screen {
         // Quad dimension sliders
         this.quadWidthSlider = new Slider(
                 (this.width - this.configWidth) / 2 + padding,
-                yStart + 3 * ySpacing + 2,
+                yStart + 3 * ySpacing + textRenderer.fontHeight + 2,
                 buttonWidth,
                 buttonHeight,
                 Text.of("Width: 1"),
                 0,
                 1,
-                50,
+                100,
                 (sldr, v) -> this.configService.setQuadWidth(v)
         );
 
         this.quadLengthSlider = new Slider(
                 (this.width - this.configWidth) / 2 + padding,
-                yStart + 4 * ySpacing + 5,
+                yStart + 4 * ySpacing + textRenderer.fontHeight + 5,
                 buttonWidth,
                 buttonHeight,
                 Text.of("Length: 1"),
                 0,
                 1,
-                50,
+                100,
                 (sldr, v) -> this.configService.setQuadLength(v)
         );
 
         this.quadHeightSlider = new Slider(
                 (this.width - this.configWidth) / 2 + padding,
-                yStart + 5 * ySpacing + 8,
+                yStart + 5 * ySpacing + textRenderer.fontHeight + 8,
                 buttonWidth,
                 buttonHeight,
                 Text.of("Height: 1"),
                 0,
                 1,
-                50,
+                100,
                 (sldr, v) -> this.configService.setQuadHeight(v)
         );
 
         // Circle dimension sliders
         this.circleRadiusSlider = new Slider(
                 (this.width - this.configWidth) / 2 + padding,
-                yStart + 3 * ySpacing + 2,
+                yStart + 3 * ySpacing + textRenderer.fontHeight + 2,
                 buttonWidth,
                 buttonHeight,
                 Text.of("Radius: 1"),
                 0,
                 1,
-                25,
+                50,
                 (sldr, v) -> this.configService.setCircleRadius(v)
         );
 
         this.circleHeightSlider = new Slider(
                 (this.width - this.configWidth) / 2 + padding,
-                yStart + 4 * ySpacing + 5,
+                yStart + 4 * ySpacing + textRenderer.fontHeight + 5,
                 buttonWidth,
                 buttonHeight,
                 Text.of("Height: 1"),
                 0,
                 1,
-                50,
+                100,
                 (sldr, v) -> this.configService.setCircleHeight(v)
         );
 
         // Sphere dimension sliders
         this.sphereRadiusSlider = new Slider(
                 (this.width - this.configWidth) / 2 + padding,
-                yStart + 3 * ySpacing + 2,
+                yStart + 3 * ySpacing + textRenderer.fontHeight + 2,
                 buttonWidth,
                 buttonHeight,
                 Text.of("Radius: 1"),
                 0,
                 1,
-                25,
+                50,
                 (sldr, v) -> this.configService.setSphereRadius(v)
         );
 
         // Offset sliders
         this.offsetXSlider = new Slider(
                 (this.width - this.configWidth) / 2 + padding,
-                yStart + 7 * ySpacing + padding + 2,
+                yStart + 7 * ySpacing + 2 * padding,
                 buttonWidth,
                 buttonHeight,
                 Text.of("X: 0"),
@@ -197,7 +197,7 @@ public class ShapeConfigScreen extends Screen {
 
         this.offsetYSlider = new Slider(
                 (this.width - this.configWidth) / 2 + padding,
-                yStart + 8 * ySpacing + padding + 5,
+                yStart + 8 * ySpacing + 2 * padding + 2,
                 buttonWidth,
                 buttonHeight,
                 Text.of("Y: 0"),
@@ -209,7 +209,7 @@ public class ShapeConfigScreen extends Screen {
 
         this.offsetZSlider = new Slider(
                 (this.width - this.configWidth) / 2 + padding,
-                yStart + 9 * ySpacing + padding + 8,
+                yStart + 9 * ySpacing + 2 * padding + 5,
                 buttonWidth,
                 buttonHeight,
                 Text.of("Z: 0"),
@@ -313,34 +313,55 @@ public class ShapeConfigScreen extends Screen {
 
         super.render(context, mouseX, mouseY, delta);
 
-        if (isQuad) {
+        if (!isLine) {
 
-            Integer totalCount = BlockCounterClient.getInstance().getBlockRenderingService().getTotalQuadCount(configService.getDimensions());
-            Integer renderCount = BlockCounterClient.getInstance().getBlockRenderingService().getRenderQuadCount(configService.getDimensions());
+            Integer totalCount;
+            Integer renderCount;
+            switch (configService.getSelectedShape()) {
+                case QUAD -> {
+                    totalCount = BlockCounterClient.getInstance().getBlockRenderingService().getTotalQuadCount(configService.getDimensions());
+                    renderCount = BlockCounterClient.getInstance().getBlockRenderingService().getRenderQuadCount(configService.getDimensions());
+                }
+                case CIRCLE -> {
+                    totalCount = BlockCounterClient.getInstance().getBlockRenderingService().getTotalCircleCount(configService.getDimensions());
+                    renderCount = BlockCounterClient.getInstance().getBlockRenderingService().getRenderCircleCount(configService.getDimensions());
+                }
+                case SPHERE -> {
+                    totalCount = BlockCounterClient.getInstance().getBlockRenderingService().getTotalSphereCount(configService.getDimensions());
+                    renderCount = BlockCounterClient.getInstance().getBlockRenderingService().getRenderSphereCount(configService.getDimensions());
+                }
+                default -> {
+                    totalCount = 0;
+                    renderCount = 0;
+                }
+            }
 
-            context.drawText(this.textRenderer, "Total: " + totalCount + " block(s), " + renderCount + " shown",
+            context.drawText(this.textRenderer, "Total: " + totalCount + (totalCount == 1 ? " block" : " blocks"),
                     (this.width - this.configWidth) / 2 + padding,
                     yStart + ySpacing + textRenderer.fontHeight,
                     0xFFFFFFFF,
                     true
             );
 
+            context.drawText(this.textRenderer, "Shown: " + renderCount + (renderCount == 1 ? " block" : " blocks"),
+                    (this.width - this.configWidth) / 2 + padding,
+                    yStart + 2 * ySpacing,
+                    0xFFFFFFFF,
+                    true
+            );
+
             context.drawText(this.textRenderer, "Dimensions",
                     (this.width - this.configWidth) / 2 + padding,
-                    yStart + 2 * ySpacing + textRenderer.fontHeight,
+                    yStart + 3 * ySpacing,
                     0xFFFFFFFF,
                     true
             );
         }
 
-        // counts here
-//        if (isCircle) {
-//        }
-
         if (showOffset) {
             context.drawText(this.textRenderer, "Offset",
                     (this.width - this.configWidth) / 2 + padding,
-                    yStart + 6 * ySpacing + textRenderer.fontHeight + padding,
+                    yStart + 7 * ySpacing + textRenderer.fontHeight,
                     0xFFFFFFFF,
                     true
             );
