@@ -36,5 +36,5 @@
   "text.autoconfig.blockcounter.renderType.solid": "Solid",
   "text.autoconfig.blockcounter.renderType.edgesOnly": "Edges Only",
   "text.autoconfig.blockcounter.renderType.solidEdges": "Solid with Edges",
-  "text.category.blockcounter": "Block Counter"
+  "key.category.minecraft.blockcounter": "Block Counter"
 }
