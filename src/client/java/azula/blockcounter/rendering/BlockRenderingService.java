@@ -1,13 +1,16 @@
 package azula.blockcounter.rendering;
 
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
+import azula.blockcounter.config.RenderType;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelExtractionContext;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.Vec3;
 
 public interface BlockRenderingService {
 
-    void renderStandingSelection(WorldRenderContext context, Vec3d firstPos, BlockPos lockPos);
+    void extractStandingSelection(LevelExtractionContext context, Vec3 firstPos, BlockPos lockPos);
 
-    void renderClickSelection(WorldRenderContext context, Vec3d firstPos, BlockPos lockPos);
+    void extractClickSelection(LevelExtractionContext context, Vec3 firstPos, BlockPos lockPos);
+
+    void renderSelection(RenderType renderType);
 
 }

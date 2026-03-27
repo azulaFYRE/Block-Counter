@@ -14,22 +14,23 @@ import me.shedaniel.autoconfig.ConfigHolder;
 import me.shedaniel.autoconfig.serializer.Toml4jConfigSerializer;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
+import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.option.KeyBinding;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.text.Text;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class BlockCounterClient implements ClientModInitializer {
@@ -41,16 +42,16 @@ public class BlockCounterClient implements ClientModInitializer {
     private final BlockRenderingService blockRenderingService = new BlockRenderingServiceImpl();
     private final LineConfigService lineConfigService = new LineConfigServiceImpl();
 
-    public static KeyBinding activationKey;
-    public static KeyBinding configMenuKey;
+    public static KeyMapping activationKey;
+    public static KeyMapping configMenuKey;
 
     private final AtomicReference<ActivationStep> standStep = new AtomicReference<>();
     private final AtomicReference<ActivationStep> clickStep = new AtomicReference<>();
 
     private BlockCounterModMenuConfig config;
 
-    private Vec3d firstPosition;
-    private Vec3d secondPosition;
+    private Vec3 firstPosition;
+    private Vec3 secondPosition;
 
     private boolean didRightClick = false;
 
@@ -65,17 +66,17 @@ public class BlockCounterClient implements ClientModInitializer {
         this.config = configHolder.getConfig();
 
         // Key binding
-        KeyBinding.Category blockCounterCategory = new KeyBinding.Category(Identifier.of("blockcounter"));
+        KeyMapping.Category blockCounterCategory = new KeyMapping.Category(Objects.requireNonNull(Identifier.tryBuild("blockcounter", "category/block-counter")));
 
         // Grab activation keyBinding
-        activationKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+        activationKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "text.autoconfig.blockcounter.option.activationKey",
                 GLFW.GLFW_KEY_COMMA,
                 blockCounterCategory
         ));
 
         // Grab config menu keyBinding
-        configMenuKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+        configMenuKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "text.autoconfig.blockcounter.option.configMenuKey",
                 GLFW.GLFW_KEY_DELETE,
                 blockCounterCategory
@@ -89,13 +90,11 @@ public class BlockCounterClient implements ClientModInitializer {
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
 
             // Check for menu key
-            while (configMenuKey.wasPressed()) {
-                client.setScreen(new LineConfigScreen(this.lineConfigService, client.currentScreen));
+            if (configMenuKey.isDown()) {
+                client.setScreen(new LineConfigScreen(this.lineConfigService, client.screen));
             }
 
-            while (activationKey.wasPressed()) {
-                assert client.player != null;
-
+            if (activationKey.isDown()) {
                 if (config.activationMethod.equals(ActivationMethod.STANDING)) {
                     handleStanding(client.player);
                 } else {
@@ -103,12 +102,12 @@ public class BlockCounterClient implements ClientModInitializer {
                 }
             }
 
-            if (client.world != null && client.player != null) {
-                boolean didClick = MinecraftClient.getInstance().mouse.wasRightButtonClicked();
+            if (client.player != null) {
+                boolean didClick = client.mouseHandler.isRightPressed();
 
                 if (didClick && didClick != this.didRightClick && config.activationMethod.equals(ActivationMethod.CLICK)) {
-                    PlayerEntity player = client.player;
-                    BlockHitResult hitResult = (BlockHitResult) player.raycast(5, 0f, true);
+                    LocalPlayer player = client.player;
+                    BlockHitResult hitResult = (BlockHitResult) player.raycastHitResult(5, client.getCameraEntity());
                     handleClick(client.player, hitResult.getBlockPos());
                 }
 
@@ -117,69 +116,89 @@ public class BlockCounterClient implements ClientModInitializer {
 
         });
 
-        UseBlockCallback.EVENT.register((playerEntity, world, hand, blockHitResult) -> {
+        UseBlockCallback.EVENT.register((_, _, _, _) -> {
             if (this.config.activationMethod.equals(ActivationMethod.CLICK)) {
                 if (this.lineConfigService.canPlaceLine()) {
                     if (this.clickStep.get().equals(ActivationStep.STARTED)) {
-                        return ActionResult.FAIL;
+                        return InteractionResult.FAIL;
                     } else if (this.clickStep.get().equals(ActivationStep.DURING) && this.secondPosition == null) {
-                        return ActionResult.FAIL;
+                        return InteractionResult.FAIL;
                     } else {
-                        return ActionResult.PASS;
+                        return InteractionResult.PASS;
                     }
                 } else {
                     if (!this.clickStep.get().equals(ActivationStep.FINISHED)) {
-                        return ActionResult.FAIL;
+                        return InteractionResult.FAIL;
                     } else {
-                        return ActionResult.PASS;
+                        return InteractionResult.PASS;
                     }
                 }
             } else {
-                return ActionResult.PASS;
+                return InteractionResult.PASS;
             }
 
         });
 
-        // Block rendering
-        WorldRenderEvents.AFTER_ENTITIES.register(context -> {
+        // Extraction phase here
+        LevelRenderEvents.END_EXTRACTION.register(context -> {
             if (firstPosition != null) {
 
                 BlockPos lockPos = null;
 
                 if (this.lineConfigService.canPlaceLine()) {
                     if (secondPosition != null) {
-                        lockPos = BlockPos.ofFloored(secondPosition);
+                        lockPos = new BlockPos(Random.toIntVec(secondPosition));
                     }
                 }
 
                 if (config.activationMethod.equals(ActivationMethod.STANDING)) {
-                    blockRenderingService.renderStandingSelection(
+                    blockRenderingService.extractStandingSelection(
                             context,
                             firstPosition,
                             lockPos);
                 } else {
-                    blockRenderingService.renderClickSelection(
+                    blockRenderingService.extractClickSelection(
                             context,
                             firstPosition,
                             lockPos);
                 }
             }
         });
+
+        // Block rendering
+        LevelRenderEvents.AFTER_TRANSLUCENT_TERRAIN.register(_ -> {
+            if (firstPosition == null) return;
+
+            if (this.lineConfigService.canPlaceLine()) {
+                if (this.config.activationMethod.equals(ActivationMethod.STANDING)) {
+                    if (this.standStep.get().equals(ActivationStep.FINISHED)) {
+                        return;
+                    }
+                } else {
+                    if (this.clickStep.get().equals(ActivationStep.FINISHED)) {
+                        return;
+                    }
+                }
+            }
+
+            this.blockRenderingService.renderSelection(config.renderType);
+
+        });
     }
 
-    private void handleStanding(PlayerEntity player) {
+    private void handleStanding(LocalPlayer player) {
         if (standStep.get().equals(ActivationStep.FINISHED)) {
 
-            BlockPos firstPos = BlockPos.ofFloored(player.getEntityPos());
-            firstPosition = Vec3d.of(firstPos);
+            BlockPos firstPos = player.getOnPos();
+            firstPosition = new Vec3(firstPos);
             printFirst(player);
 
             standStep.set(ActivationStep.STARTED);
 
         } else if (standStep.get().equals(ActivationStep.STARTED)) {
 
-            BlockPos secondPos = BlockPos.ofFloored(player.getEntityPos());
-            secondPosition = Vec3d.of(secondPos);
+            BlockPos secondPos = player.getOnPos();
+            secondPosition = new Vec3(secondPos);
 
             printSecond(player);
 
@@ -199,14 +218,16 @@ public class BlockCounterClient implements ClientModInitializer {
         }
     }
 
-    private void handleClickActivation(PlayerEntity player) {
+    private void handleClickActivation(LocalPlayer player) {
         if (clickStep.get().equals(ActivationStep.FINISHED)) {
 
-            player.sendMessage(
-                    Text.literal("Right click first position...")
-                            .formatted(Random.chatColorToFormat(config.chatColor)),
-                    !config.msgDisplayLocation.equals(MessageDisplay.CHAT)
-            );
+            if (config.msgDisplayLocation.equals(MessageDisplay.CHAT)) {
+                player.sendSystemMessage(Component.literal("Right click first position...")
+                        .withStyle(Random.chatColorToFormat(config.chatColor)));
+            } else {
+                player.sendOverlayMessage(Component.literal("Right click first position...")
+                        .withStyle(Random.chatColorToFormat(config.chatColor)));
+            }
 
             firstPosition = null;
             secondPosition = null;
@@ -215,11 +236,13 @@ public class BlockCounterClient implements ClientModInitializer {
 
         } else if (clickStep.get().equals(ActivationStep.STARTED)) {
 
-            player.sendMessage(
-                    Text.literal("Block count aborted.")
-                            .formatted(Random.chatColorToFormat(config.chatColor)),
-                    !config.msgDisplayLocation.equals(MessageDisplay.CHAT)
-            );
+            if (config.msgDisplayLocation.equals(MessageDisplay.CHAT)) {
+                player.sendSystemMessage(Component.literal("Block count aborted.")
+                        .withStyle(Random.chatColorToFormat(config.chatColor)));
+            } else {
+                player.sendOverlayMessage(Component.literal("Block count aborted.")
+                        .withStyle(Random.chatColorToFormat(config.chatColor)));
+            }
 
             clickStep.set(ActivationStep.FINISHED);
 
@@ -233,25 +256,27 @@ public class BlockCounterClient implements ClientModInitializer {
         }
     }
 
-    private void handleClick(PlayerEntity player, BlockPos pos) {
+    private void handleClick(LocalPlayer player, BlockPos pos) {
 
         if (clickStep.get().equals(ActivationStep.STARTED)) {
-            firstPosition = Vec3d.of(pos);
+            firstPosition = new Vec3(pos);
             secondPosition = null;
 
             printFirst(player);
 
             clickStep.set(ActivationStep.DURING);
 
-            player.sendMessage(
-                    Text.literal("Right click second position...")
-                            .formatted(Random.chatColorToFormat(config.chatColor)),
-                    !config.msgDisplayLocation.equals(MessageDisplay.CHAT)
-            );
+            if (config.msgDisplayLocation.equals(MessageDisplay.CHAT)) {
+                player.sendSystemMessage(Component.literal("Right click second position...")
+                        .withStyle(Random.chatColorToFormat(config.chatColor)));
+            } else {
+                player.sendOverlayMessage(Component.literal("Right click second position...")
+                        .withStyle(Random.chatColorToFormat(config.chatColor)));
+            }
 
         } else if (clickStep.get().equals(ActivationStep.DURING)) {
             if (!this.lineConfigService.canPlaceLine()) {
-                secondPosition = Vec3d.of(pos);
+                secondPosition = new Vec3(pos);
 
                 printSecond(player);
 
@@ -261,46 +286,54 @@ public class BlockCounterClient implements ClientModInitializer {
                 clickStep.set(ActivationStep.FINISHED);
             } else {
                 if (secondPosition == null) {
-                    secondPosition = Vec3d.of(pos);
+                    secondPosition = new Vec3(pos);
                     printSecond(player);
                 }
             }
         }
     }
 
-    private void printFirst(PlayerEntity player) {
+    private void printFirst(LocalPlayer player) {
 
         if (config.showPosMessages) {
             boolean simplify = config.simplifiedMessages;
 
-            String first = Random.formatVec3d(firstPosition, "%,.2f");
+            String first = Random.formatVec3(firstPosition, "%,.2f");
 
             String firstPosLong = "First: %s";
             String firstPosShort = "1: %s";
 
-            player.sendMessage(Text.literal(
-                                    simplify ? String.format(firstPosShort, first) : String.format(firstPosLong, first))
-                            .formatted(Random.chatColorToFormat(config.chatColor)),
-                    !config.msgDisplayLocation.equals(MessageDisplay.CHAT)
-            );
+            MutableComponent chatMsg = Component.literal(
+                    simplify ? String.format(firstPosShort, first) : String.format(firstPosLong, first))
+                    .withStyle(Random.chatColorToFormat(config.chatColor));
+
+            if (config.msgDisplayLocation.equals(MessageDisplay.CHAT)) {
+                player.sendSystemMessage(chatMsg);
+            } else {
+                player.sendOverlayMessage(chatMsg);
+            }
         }
     }
 
-    private void printSecond(PlayerEntity player) {
+    private void printSecond(LocalPlayer player) {
         boolean simplify = config.simplifiedMessages;
         boolean isClick = config.activationMethod.equals(ActivationMethod.CLICK);
 
         if (config.showPosMessages) {
-            String second = Random.formatVec3d(secondPosition, "%,.2f");
+            String second = Random.formatVec3(secondPosition, "%,.2f");
 
             String secondPosLong = "Second: %s";
             String secondPosShort = "2: %s";
 
-            player.sendMessage(
-                    Text.literal(simplify ? String.format(secondPosShort, second) : String.format(secondPosLong, second))
-                            .formatted(Random.chatColorToFormat(config.chatColor)),
-                    !config.msgDisplayLocation.equals(MessageDisplay.CHAT)
-            );
+            MutableComponent chatMsg = Component.literal(
+                    simplify ? String.format(secondPosShort, second) : String.format(secondPosLong, second))
+                    .withStyle(Random.chatColorToFormat(config.chatColor));
+
+            if (config.msgDisplayLocation.equals(MessageDisplay.CHAT)) {
+                player.sendSystemMessage(chatMsg);
+            } else {
+                player.sendOverlayMessage(chatMsg);
+            }
         }
 
         int dist;
@@ -317,14 +350,16 @@ public class BlockCounterClient implements ClientModInitializer {
         String distLong = "Distance: %s %s";
         String distShort = "D: %d";
 
-        player.sendMessage(
-                Text.literal((simplify ?
-                                String.format(distShort, dist)
-                                : String.format(distLong, dist, dist == 1 ? "block" : "blocks")))
-                        .formatted(Random.chatColorToFormat(config.chatColor)),
-                !config.msgDisplayLocation.equals(MessageDisplay.CHAT)
-        );
+        MutableComponent chatMsg = Component.literal((simplify ?
+                        String.format(distShort, dist)
+                        : String.format(distLong, dist, dist == 1 ? "block" : "blocks")))
+                .withStyle(Random.chatColorToFormat(config.chatColor));
 
+        if (config.msgDisplayLocation.equals(MessageDisplay.CHAT)) {
+            player.sendSystemMessage(chatMsg);
+        } else {
+            player.sendOverlayMessage(chatMsg);
+        }
     }
 
     public LineConfigService getLineConfigService() {

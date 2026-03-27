@@ -1,16 +1,18 @@
 package azula.blockcounter.rendering;
 
 import azula.blockcounter.BlockCounterClient;
+import azula.blockcounter.config.RenderType;
 import azula.blockcounter.config.shape.LineConfigService;
 import azula.blockcounter.util.BlockCalculations;
 import azula.blockcounter.util.Random;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelExtractionContext;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Vec3i;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,65 +22,78 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
 
     private final RenderingService renderingService;
 
+    private final int MAX_RAY_DIST = 5;
+
     public BlockRenderingServiceImpl() {
         this.renderingService = new RenderingServiceImpl();
     }
 
     @Override
-    public void renderStandingSelection(WorldRenderContext context, Vec3d firstPos, BlockPos lockPos) {
+    public void extractStandingSelection(LevelExtractionContext context, Vec3 firstPos, BlockPos lockPos) {
 
         if (firstPos != null) {
-            assert MinecraftClient.getInstance().player != null;
+            Minecraft client = Minecraft.getInstance();
+            assert client.player != null;
 
-            Vec3d playerPos = MinecraftClient.getInstance().player.getEntityPos();
-            BlockPos blockPosFirst = BlockPos.ofFloored(firstPos);
-            BlockPos blockPosPlayer = BlockPos.ofFloored(playerPos);
-            Vec3d toRender = Vec3d.of(blockPosPlayer);
+            Vec3 playerPos = client.player.getOnPos().getBottomCenter();
+
+            BlockPos blockPosFirst = new BlockPos(Random.toIntVec(firstPos));
+            BlockPos blockPosPlayer = new BlockPos(Random.toIntVec(playerPos));
+            Vec3 toRender = new Vec3(blockPosPlayer);
 
             if (lockPos != null) {
                 blockPosPlayer = lockPos;
-                toRender = Vec3d.of(blockPosPlayer);
+                toRender = new Vec3(blockPosPlayer);
             }
 
-            Vec3d fixedFirst = Vec3d.of(blockPosFirst);
+            Vec3 fixedFirst = new Vec3(blockPosFirst);
 
-            this.renderLine(context, fixedFirst, toRender, false);
+            this.extractLine(context, fixedFirst, toRender, false);
         }
     }
 
     @Override
-    public void renderClickSelection(WorldRenderContext context, Vec3d firstPos, BlockPos lockPos) {
+    public void extractClickSelection(LevelExtractionContext context, Vec3 firstPos, BlockPos lockPos) {
 
         if (firstPos != null) {
-            Vec3d secondPos = getCrosshairBlockPos();
+            Vec3 secondPos = getCrosshairBlockPos();
 
             if (lockPos != null) {
-                secondPos = Vec3d.of(lockPos);
+                secondPos = new Vec3(lockPos);
             }
 
             if (secondPos != null) {
-                this.renderLine(context, firstPos, secondPos, true);
+                this.extractLine(context, firstPos, secondPos, true);
             }
         }
 
     }
 
-    private Vec3d getCrosshairBlockPos() {
+    @Override
+    public void renderSelection(RenderType renderType) {
+        switch (renderType) {
+            case SOLID -> this.renderingService.renderQuadBuffer();
+            case EDGE_ONLY -> this.renderingService.renderLineBuffer();
+            case SOLID_EDGE -> {
+                this.renderingService.renderQuadBuffer();
+                this.renderingService.renderLineBuffer();
+            }
+        }
+    }
 
-        MinecraftClient client = MinecraftClient.getInstance();
-        ClientPlayerEntity player = client.player;
+    private Vec3 getCrosshairBlockPos() {
 
-        // Pretty sure this should technically never happen, just shutting up the IDE for next methods
+        Minecraft client = Minecraft.getInstance();
+        LocalPlayer player = client.player;
+
         assert player != null;
-        assert client.world != null;
-
-        int MAX_DIST = 5;
+        assert client.getCameraEntity() != null;
 
         // Raycast to where the player is currently looking
-        BlockHitResult rayCastResult = (BlockHitResult) player.raycast(MAX_DIST, 0f, false);
+        BlockHitResult rayCastResult = (BlockHitResult) player.raycastHitResult(0, client.getCameraEntity());
 
-        if (rayCastResult != null) {
-            return new Vec3d(
+        if (rayCastResult.getBlockPos().getCenter().distanceTo(player.getEyePosition()) - 0.5 <= MAX_RAY_DIST) {
+            return new Vec3(
                     rayCastResult.getBlockPos().getX(),
                     rayCastResult.getBlockPos().getY(),
                     rayCastResult.getBlockPos().getZ()
@@ -88,36 +103,36 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
         return null;
     }
 
-    private void renderLine(WorldRenderContext context, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
+    private void extractLine(LevelExtractionContext context, Vec3 firstPos, Vec3 secondPos, boolean isClick) {
 
         LineConfigService shapeService = BlockCounterClient.getInstance().getLineConfigService();
 
         if (shapeService.isAxisAligned()) {
 
             if (!shapeService.isTwoAxis()) {
-                this.renderSingleLine(context, firstPos, secondPos, isClick);
+                this.extractSingleLine(context, firstPos, secondPos, isClick);
             } else {
-                this.renderDoubleLine(context, firstPos, secondPos, isClick);
+                this.extractDoubleLine(context, firstPos, secondPos, isClick);
             }
 
         } else {
-            this.renderFreeLine(context, firstPos, secondPos, isClick);
+            this.extractFreeLine(context, firstPos, secondPos, isClick);
         }
 
     }
 
-    private void renderSingleLine(WorldRenderContext context, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
+    private void extractSingleLine(LevelExtractionContext context, Vec3 firstPos, Vec3 secondPos, boolean isClick) {
 
         LineConfigService service = BlockCounterClient.getInstance().getLineConfigService();
-        Vec3d offset = new Vec3d(service.getXOffset(), service.getYOffset(), service.getZOffset());
+        Vec3i offset = new Vec3i(service.getXOffset(), service.getYOffset(), service.getZOffset());
 
-        Vec3d firstPosInt = Random.toIntVec(firstPos).add(offset);
-        Vec3d secondPosInt = Random.toIntVec(secondPos).add(offset);
+        Vec3i firstPosInt = Random.toIntVec(firstPos).offset(offset);
+        Vec3i secondPosInt = Random.toIntVec(secondPos).offset(offset);
 
-        Vec3d alteredSecond = new Vec3d(secondPosInt.x, secondPosInt.y - (isClick ? 0 : 1), secondPosInt.z);
-        Vec3d renderPos = new Vec3d(firstPosInt.x, firstPosInt.y - (isClick ? 0 : 1), firstPosInt.z);
+        Vec3 alteredSecond = new Vec3(secondPosInt.getX(), secondPosInt.getY() - (isClick ? 0 : 1), secondPosInt.getZ());
+        Vec3 renderPos = new Vec3(firstPosInt.getX(), firstPosInt.getY() - (isClick ? 0 : 1), firstPosInt.getZ());
 
-        Vec3d dimensions = this.findDimensions(renderPos, alteredSecond);
+        Vec3 dimensions = this.findDimensions(renderPos, alteredSecond);
 
         int clickOffset = isClick ? 1 : 0;
         int standOffset = isClick ? 0 : 1;
@@ -126,121 +141,102 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
         // positive while translating the initial render position in order to render using positive dimensions
         if (dimensions.x < 0) {
             double absX = Math.abs(dimensions.x);
-            int newFirstX = (int) (firstPosInt.x - absX);
+            int newFirstX = (int) (firstPosInt.getX() - absX);
 
             // Update the dimensions to be a positive offset while shifting the render position back
-            dimensions = new Vec3d(absX + 1, dimensions.y, dimensions.z);
-            renderPos = new Vec3d(newFirstX, renderPos.y, renderPos.z);
+            dimensions = new Vec3(absX + 1, dimensions.y, dimensions.z);
+            renderPos = new Vec3(newFirstX, renderPos.y, renderPos.z);
         } else if (dimensions.y < 0) {
             double absY = Math.abs(dimensions.y);
-            int newFirstY = (int) (firstPosInt.y - (absY + standOffset));
+            int newFirstY = (int) (firstPosInt.getY() - (absY + standOffset));
 
-            dimensions = new Vec3d(dimensions.x, absY + clickOffset + standOffset, dimensions.z);
-            renderPos = new Vec3d(renderPos.x, newFirstY, renderPos.z);
+            dimensions = new Vec3(dimensions.x, absY + clickOffset + standOffset, dimensions.z);
+            renderPos = new Vec3(renderPos.x, newFirstY, renderPos.z);
         } else if (dimensions.z < 0) {
             double absZ = Math.abs(dimensions.z);
-            int newFirstZ = (int) (firstPosInt.z - absZ);
+            int newFirstZ = (int) (firstPosInt.getZ() - absZ);
 
-            dimensions = new Vec3d(dimensions.x, dimensions.y, absZ + 1);
-            renderPos = new Vec3d(renderPos.x, renderPos.y, newFirstZ);
+            dimensions = new Vec3(dimensions.x, dimensions.y, absZ + 1);
+            renderPos = new Vec3(renderPos.x, renderPos.y, newFirstZ);
         }
 
         if (dimensions.y > 1 && !isClick) {
-            dimensions = new Vec3d(dimensions.x, dimensions.y - 1, dimensions.z);
-            renderPos = new Vec3d(renderPos.x, renderPos.y + 1, renderPos.z);
+            dimensions = new Vec3(dimensions.x, dimensions.y - 1, dimensions.z);
+            renderPos = new Vec3(renderPos.x, renderPos.y + 1, renderPos.z);
         }
 
         Direction.Axis dir = BlockCalculations.findLargestAxisDiff(dimensions);
 
         int stopIndex = (int) (dir.equals(Direction.Axis.X) ? dimensions.x :
                 (dir.equals(Direction.Axis.Y) ? dimensions.y : dimensions.z));
-        Vec3d toAdd = (dir.equals(Direction.Axis.X) ? new Vec3d(1, 0, 0) :
-                (dir.equals(Direction.Axis.Y) ? new Vec3d(0, 1, 0) : new Vec3d(0, 0, 1)));
+        Vec3 toAdd = (dir.equals(Direction.Axis.X) ? new Vec3(1, 0, 0) :
+                (dir.equals(Direction.Axis.Y) ? new Vec3(0, 1, 0) : new Vec3(0, 0, 1)));
+
+        List<Vec3> renders = new ArrayList<>();
+
+        for (int b = 0; b < stopIndex; b++) {
+            renders.add(renderPos);
+            renderPos = renderPos.add(toAdd);
+        }
 
         switch (BlockCounterClient.getInstance().getConfig().renderType) {
-            case SOLID -> {
-                this.renderingService.startQuadBuffer(context);
-                for (int b = 0; b < stopIndex; b++) {
-                    this.renderingService.addSolid(context, renderPos);
-                    renderPos = renderPos.add(toAdd);
-                }
-            }
-            case EDGE_ONLY -> {
-                this.renderingService.startLineBuffer(context);
-                for (int b = 0; b < stopIndex; b++) {
-                    this.renderingService.addEdged(context, renderPos);
-                    renderPos = renderPos.add(toAdd);
-                }
-            }
+            case SOLID -> this.renderingService.fillQuadBuffer(context, renders);
+            case EDGE_ONLY -> this.renderingService.fillLineBuffer(context, renders);
             case SOLID_EDGE -> {
-                this.renderingService.startQuadBuffer(context);
-
-                Vec3d start = new Vec3d(renderPos.x, renderPos.y, renderPos.z);
-
-                for (int b = 0; b < stopIndex; b++) {
-                    this.renderingService.addSolid(context, renderPos);
-                    renderPos = renderPos.add(toAdd);
-                }
-
-                renderPos = new Vec3d(start.x, start.y, start.z);
-
-                this.renderingService.startLineBuffer(context);
-                for (int b = 0; b < stopIndex; b++) {
-                    this.renderingService.addEdged(context, renderPos);
-                    renderPos = renderPos.add(toAdd);
-                }
+                this.renderingService.fillQuadBuffer(context, renders);
+                this.renderingService.fillLineBuffer(context, renders);
             }
         }
     }
 
-    private void renderDoubleLine(WorldRenderContext context, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
+    private void extractDoubleLine(LevelExtractionContext context, Vec3 firstPos, Vec3 secondPos, boolean isClick) {
 
-        Vec3d firstPosInt = Random.toIntVec(firstPos);
-        Vec3d firstStart = new Vec3d(firstPosInt.x, firstPosInt.y, firstPosInt.z);
+        Vec3i firstPosInt = Random.toIntVec(firstPos);
+        Vec3 firstStart = new Vec3(firstPosInt.getX(), firstPosInt.getY(), firstPosInt.getZ());
 
-        Vec3d secondPosInt = Random.toIntVec(secondPos);
-        Vec3d secondStart = new Vec3d(secondPosInt.x, secondPosInt.y, secondPosInt.z);
+        Vec3i secondPosInt = Random.toIntVec(secondPos);
+        Vec3 secondStart = new Vec3(secondPosInt.getX(), secondPosInt.getY(), secondPosInt.getZ());
 
         List<Direction.Axis> largestDiffs = BlockCalculations.findTwoLargestAxisDiff(firstStart, secondStart);
 
         Direction.Axis first = largestDiffs.getFirst();
         Direction.Axis second = largestDiffs.get(1);
 
-        Vec3d firstEnd;
+        Vec3 firstEnd;
         if (first.equals(Direction.Axis.X)) {
-            firstEnd = new Vec3d(secondStart.x, firstStart.y, firstStart.z);
+            firstEnd = new Vec3(secondStart.x, firstStart.y, firstStart.z);
         } else if (first.equals(Direction.Axis.Y)) {
-            firstEnd = new Vec3d(firstStart.x, secondStart.y, firstStart.z);
+            firstEnd = new Vec3(firstStart.x, secondStart.y, firstStart.z);
         } else {
-            firstEnd = new Vec3d(firstStart.x, firstStart.y, secondStart.z);
+            firstEnd = new Vec3(firstStart.x, firstStart.y, secondStart.z);
         }
 
-        this.renderSingleLine(context, firstStart, firstEnd, isClick);
+        this.extractSingleLine(context, firstStart, firstEnd, isClick);
 
-        Vec3d secondEnd;
+        Vec3 secondEnd;
         if (second.equals(Direction.Axis.X)) {
-            secondEnd = new Vec3d(secondStart.x, firstEnd.y, firstEnd.z);
+            secondEnd = new Vec3(secondStart.x, firstEnd.y, firstEnd.z);
         } else if (second.equals(Direction.Axis.Y)) {
-            secondEnd = new Vec3d(firstEnd.x, secondStart.y, firstEnd.z);
+            secondEnd = new Vec3(firstEnd.x, secondStart.y, firstEnd.z);
         } else {
-            secondEnd = new Vec3d(firstEnd.x, firstEnd.y, secondStart.z);
+            secondEnd = new Vec3(firstEnd.x, firstEnd.y, secondStart.z);
         }
 
-        this.renderSingleLine(context, firstEnd, secondEnd, isClick);
+        this.extractSingleLine(context, firstEnd, secondEnd, isClick);
 
     }
 
     // 3D Line Drawing algorithm with slight tweaks
     // https://www.geeksforgeeks.org/bresenhams-algorithm-for-3-d-line-drawing/
-    private void renderFreeLine(WorldRenderContext context, Vec3d firstPos, Vec3d secondPos, boolean isClick) {
+    private void extractFreeLine(LevelExtractionContext context, Vec3 firstPos, Vec3 secondPos, boolean isClick) {
         LineConfigService service = BlockCounterClient.getInstance().getLineConfigService();
-        Vec3d offset = new Vec3d(service.getXOffset(), service.getYOffset(), service.getZOffset());
+        Vec3i offset = new Vec3i(service.getXOffset(), service.getYOffset(), service.getZOffset());
 
-        Vec3d firstPosInt = Random.toIntVec(firstPos).add(offset);
-        Vec3d secondPosInt = Random.toIntVec(secondPos).add(offset);
+        Vec3i firstPosInt = Random.toIntVec(firstPos).offset(offset);
+        Vec3i secondPosInt = Random.toIntVec(secondPos).offset(offset);
 
-        Vec3d startPos = new Vec3d(firstPosInt.x, firstPosInt.y - (isClick ? 0 : 1), firstPosInt.z);
-        Vec3d endPos = new Vec3d(secondPosInt.x, secondPosInt.y - (isClick ? 0 : 1), secondPosInt.z);
+        Vec3 startPos = new Vec3(firstPosInt.getX(), firstPosInt.getY() - (isClick ? 0 : 1), firstPosInt.getZ());
+        Vec3 endPos = new Vec3(secondPosInt.getX(), secondPosInt.getY() - (isClick ? 0 : 1), secondPosInt.getZ());
 
         int x = (int) startPos.x;
         int y = (int) startPos.y;
@@ -250,14 +246,14 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
         int dx = Math.abs(((int) endPos.x) - x);
         int dz = Math.abs(((int) endPos.z) - z);
 
-        List<Vec3d> renderPoints = new ArrayList<>();
+        List<Vec3> renderPoints = new ArrayList<>();
         renderPoints.add(startPos);
 
-        Vec3d xs, ys, zs;
+        Vec3 xs, ys, zs;
 
-        xs = new Vec3d(endPos.x > startPos.x ? 1 : -1, 0, 0);
-        ys = new Vec3d(0, endPos.y > startPos.y ? 1 : -1, 0);
-        zs = new Vec3d(0, 0, endPos.z > startPos.z ? 1 : -1);
+        xs = new Vec3(endPos.x > startPos.x ? 1 : -1, 0, 0);
+        ys = new Vec3(0, endPos.y > startPos.y ? 1 : -1, 0);
+        zs = new Vec3(0, 0, endPos.z > startPos.z ? 1 : -1);
 
         Direction.Axis largestDiff = BlockCalculations.findLargestAxisDiff(startPos, endPos);
 
@@ -277,7 +273,7 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
                 }
                 p1 += 2 * dy;
                 p2 += 2 * dz;
-                renderPoints.add(new Vec3d(startPos.x, startPos.y, startPos.z));
+                renderPoints.add(new Vec3(startPos.x, startPos.y, startPos.z));
             }
         } else if (largestDiff.equals(Direction.Axis.Y)) {
             int p1 = 2 * dx - dy;
@@ -295,7 +291,7 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
                 }
                 p1 += 2 * dx;
                 p2 += 2 * dz;
-                renderPoints.add(new Vec3d(startPos.x, startPos.y, startPos.z));
+                renderPoints.add(new Vec3(startPos.x, startPos.y, startPos.z));
             }
         } else {
             int p1 = 2 * dy - dz;
@@ -313,37 +309,28 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
                 }
                 p1 += 2 * dy;
                 p2 += 2 * dx;
-                renderPoints.add(new Vec3d(startPos.x, startPos.y, startPos.z));
+                renderPoints.add(new Vec3(startPos.x, startPos.y, startPos.z));
             }
         }
 
         switch (BlockCounterClient.getInstance().getConfig().renderType) {
-            case SOLID -> {
-                this.renderingService.startQuadBuffer(context);
-                renderPoints.forEach(p -> this.renderingService.addSolid(context, p));
-            }
-            case EDGE_ONLY -> {
-                this.renderingService.startLineBuffer(context);
-                renderPoints.forEach(p -> this.renderingService.addEdged(context, p));
-            }
+            case SOLID -> this.renderingService.fillQuadBuffer(context, renderPoints);
+            case EDGE_ONLY -> this.renderingService.fillLineBuffer(context, renderPoints);
             case SOLID_EDGE -> {
-                this.renderingService.startQuadBuffer(context);
-                renderPoints.forEach(p -> this.renderingService.addSolid(context, p));
-
-                this.renderingService.startLineBuffer(context);
-                renderPoints.forEach(p -> this.renderingService.addEdged(context, p));
+                this.renderingService.fillQuadBuffer(context, renderPoints);
+                this.renderingService.fillLineBuffer(context,renderPoints);
             }
         }
     }
 
-    private Vec3d findDimensions(Vec3d firstPos, Vec3d secondPos) {
+    private Vec3 findDimensions(Vec3 firstPos, Vec3 secondPos) {
 
-        Vec3d firstPosInt = Random.toIntVec(firstPos);
-        Vec3d secondPosInt = Random.toIntVec(secondPos);
+        Vec3i firstPosInt = Random.toIntVec(firstPos);
+        Vec3i secondPosInt = Random.toIntVec(secondPos);
 
-        int diffX = (int) (secondPosInt.x - firstPosInt.x);
-        int diffY = (int) (secondPosInt.y - firstPosInt.y);
-        int diffZ = (int) (secondPosInt.z - firstPosInt.z);
+        int diffX = secondPosInt.getX() - firstPosInt.getX();
+        int diffY = secondPosInt.getY() - firstPosInt.getY();
+        int diffZ = secondPosInt.getZ() - firstPosInt.getZ();
 
         Direction.Axis maxDiff = BlockCalculations.findLargestAxisDiff(firstPos, secondPos);
 
@@ -359,7 +346,7 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
             z = diffZ == 0 ? z : (diffZ > 0 ? diffZ + 1 : diffZ);
         }
 
-        return new Vec3d(x, y, z);
+        return new Vec3(x, y, z);
     }
 
 }

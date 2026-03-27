@@ -1,7 +1,8 @@
 package azula.blockcounter.util;
 
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Vec3i;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -9,60 +10,60 @@ import java.util.List;
 
 public class BlockCalculations {
 
-    public static int calculateBlocksOne(Vec3d firstPos, Vec3d secondPos, boolean isClick) {
+    public static int calculateBlocksOne(Vec3 firstPos, Vec3 secondPos, boolean isClick) {
         Direction.Axis largestDiff = findLargestAxisDiff(firstPos, secondPos);
 
-        Vec3d newFirst, newSecond;
+        Vec3 newFirst, newSecond;
 
         if (largestDiff.equals(Direction.Axis.X)) {
-            Vec3d x = new Vec3d(1, 0, 0);
-            newFirst = firstPos.projectOnto(x);
-            newSecond = secondPos.projectOnto(x);
+            Vec3 x = new Vec3(1, 0, 0);
+            newFirst = firstPos.projectedOn(x);
+            newSecond = secondPos.projectedOn(x);
         } else if (largestDiff.equals(Direction.Axis.Y)) {
-            Vec3d y = new Vec3d(0, 1, 0);
-            newFirst = firstPos.projectOnto(y);
-            newSecond = secondPos.projectOnto(y);
+            Vec3 y = new Vec3(0, 1, 0);
+            newFirst = firstPos.projectedOn(y);
+            newSecond = secondPos.projectedOn(y);
         } else {
-            Vec3d z = new Vec3d(0, 0, 1);
-            newFirst = firstPos.projectOnto(z);
-            newSecond = secondPos.projectOnto(z);
+            Vec3 z = new Vec3(0, 0, 1);
+            newFirst = firstPos.projectedOn(z);
+            newSecond = secondPos.projectedOn(z);
         }
 
         return (int) Math.ceil(newFirst.distanceTo(newSecond))
                 + (!isClick && largestDiff.equals(Direction.Axis.Y) ? 0 : 1);
     }
 
-    public static int calculateBlocksTwo(Vec3d firstPos, Vec3d secondPos, boolean isClick) {
+    public static int calculateBlocksTwo(Vec3 firstPos, Vec3 secondPos, boolean isClick) {
         List<Direction.Axis> diffs = findTwoLargestAxisDiff(firstPos, secondPos);
         Direction.Axis first = diffs.getFirst();
         Direction.Axis second = diffs.get(1);
 
-        Vec3d firstStart, firstEnd, secondStart, secondEnd;
+        Vec3 firstStart, firstEnd, secondStart, secondEnd;
 
-        Vec3d x = new Vec3d(1, 0, 0);
-        Vec3d y = new Vec3d(0, 1, 0);
-        Vec3d z = new Vec3d(0, 0, 1);
+        Vec3 x = new Vec3(1, 0, 0);
+        Vec3 y = new Vec3(0, 1, 0);
+        Vec3 z = new Vec3(0, 0, 1);
 
         if (first.equals(Direction.Axis.X)) {
-            firstStart = firstPos.projectOnto(x);
-            firstEnd = secondPos.projectOnto(x);
+            firstStart = firstPos.projectedOn(x);
+            firstEnd = secondPos.projectedOn(x);
         } else if (first.equals(Direction.Axis.Y)) {
-            firstStart = firstPos.projectOnto(y);
-            firstEnd = secondPos.projectOnto(y);
+            firstStart = firstPos.projectedOn(y);
+            firstEnd = secondPos.projectedOn(y);
         } else {
-            firstStart = firstPos.projectOnto(z);
-            firstEnd = secondPos.projectOnto(z);
+            firstStart = firstPos.projectedOn(z);
+            firstEnd = secondPos.projectedOn(z);
         }
 
         if (second.equals(Direction.Axis.X)) {
-            secondStart = firstPos.projectOnto(x);
-            secondEnd = secondPos.projectOnto(x);
+            secondStart = firstPos.projectedOn(x);
+            secondEnd = secondPos.projectedOn(x);
         } else if (second.equals(Direction.Axis.Y)) {
-            secondStart = firstPos.projectOnto(y);
-            secondEnd = secondPos.projectOnto(y);
+            secondStart = firstPos.projectedOn(y);
+            secondEnd = secondPos.projectedOn(y);
         } else {
-            secondStart = firstPos.projectOnto(z);
-            secondEnd = secondPos.projectOnto(z);
+            secondStart = firstPos.projectedOn(z);
+            secondEnd = secondPos.projectedOn(z);
         }
 
         int firstTotal = (int) Math.ceil(firstStart.distanceTo(firstEnd))
@@ -75,12 +76,12 @@ public class BlockCalculations {
         return firstTotal + secondTotal - ((firstTotal != 0 && secondTotal != 0) ? 1 : 0);
     }
 
-    public static int calculateBlocksFree(Vec3d firstPos, Vec3d secondPos, boolean isClick) {
-        Vec3d firstPosInt = Random.toIntVec(firstPos);
-        Vec3d secondPosInt = Random.toIntVec(secondPos);
+    public static int calculateBlocksFree(Vec3 firstPos, Vec3 secondPos, boolean isClick) {
+        Vec3i firstPosInt = Random.toIntVec(firstPos);
+        Vec3i secondPosInt = Random.toIntVec(secondPos);
 
-        Vec3d startPos = new Vec3d(firstPosInt.x, firstPosInt.y - (isClick ? 0 : 1), firstPosInt.z);
-        Vec3d endPos = new Vec3d(secondPosInt.x, secondPosInt.y, secondPosInt.z);
+        Vec3 startPos = new Vec3(firstPosInt.getX(), firstPosInt.getY() - (isClick ? 0 : 1), firstPosInt.getZ());
+        Vec3 endPos = new Vec3(secondPosInt.getX(), secondPosInt.getY(), secondPosInt.getZ());
 
         int x = (int) startPos.x;
         int y = (int) startPos.y;
@@ -92,11 +93,11 @@ public class BlockCalculations {
 
         int totalBlocks = 1;
 
-        Vec3d xs, ys, zs;
+        Vec3 xs, ys, zs;
 
-        xs = new Vec3d(endPos.x > startPos.x ? 1 : -1, 0, 0);
-        ys = new Vec3d(0, endPos.y > startPos.y ? 1 : -1, 0);
-        zs = new Vec3d(0, 0, endPos.z > startPos.z ? 1 : -1);
+        xs = new Vec3(endPos.x > startPos.x ? 1 : -1, 0, 0);
+        ys = new Vec3(0, endPos.y > startPos.y ? 1 : -1, 0);
+        zs = new Vec3(0, 0, endPos.z > startPos.z ? 1 : -1);
 
         Direction.Axis largestDiff = BlockCalculations.findLargestAxisDiff(startPos, endPos);
 
@@ -159,9 +160,9 @@ public class BlockCalculations {
         return totalBlocks;
     }
 
-    public static Direction.Axis findLargestAxisDiff(Vec3d firstPos, Vec3d secondPos) {
+    public static Direction.Axis findLargestAxisDiff(Vec3 firstPos, Vec3 secondPos) {
 
-        Vec3d diff = secondPos.subtract(firstPos);
+        Vec3 diff = secondPos.subtract(firstPos);
 
         double x = Math.abs(diff.x);
         double y = Math.abs(diff.y);
@@ -179,10 +180,10 @@ public class BlockCalculations {
 
     }
 
-    public static List<Direction.Axis> findTwoLargestAxisDiff(Vec3d firstPos, Vec3d secondPos) {
+    public static List<Direction.Axis> findTwoLargestAxisDiff(Vec3 firstPos, Vec3 secondPos) {
         List<Direction.Axis> axes = new ArrayList<>(Arrays.asList(Direction.Axis.X, Direction.Axis.Y, Direction.Axis.Z));
 
-        Vec3d diff = secondPos.subtract(firstPos);
+        Vec3 diff = secondPos.subtract(firstPos);
 
         double x = Math.abs(diff.x);
         double y = Math.abs(diff.y);
@@ -201,7 +202,7 @@ public class BlockCalculations {
         return axes;
     }
 
-    public static Direction.Axis findLargestAxisDiff(Vec3d pos) {
+    public static Direction.Axis findLargestAxisDiff(Vec3 pos) {
         double maxDiff = Math.max(pos.x, Math.max(pos.y, pos.z));
 
         if (maxDiff == pos.x) {
