@@ -26,6 +26,9 @@ repositories {
 	// Cloth Config API
 	maven { url = "https://maven.shedaniel.me/" }
 	maven { url = "https://maven.terraformersmc.com/releases" }
+
+	// Modrinth
+	maven { url = "https://api.modrinth.com/maven" }
 }
 
 loom {
@@ -59,6 +62,9 @@ dependencies {
 	// Iris
 //	clientRuntimeOnly(files("libs/iris-fabric-1.10.8+mc26.1.jar"))
 //	clientRuntimeOnly(files("libs/sodium-fabric-0.8.7+mc26.1.jar"))
+	implementation "maven.modrinth:iris:${iris_version}"
+	implementation "maven.modrinth:sodium:${sodium_version}"
+
 }
 
 processResources {

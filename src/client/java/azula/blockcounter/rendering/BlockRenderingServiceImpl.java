@@ -12,6 +12,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3i;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
@@ -21,8 +22,6 @@ import java.util.List;
 public class BlockRenderingServiceImpl implements BlockRenderingService {
 
     private final RenderingService renderingService;
-
-    private final int MAX_RAY_DIST = 5;
 
     public BlockRenderingServiceImpl() {
         this.renderingService = new RenderingServiceImpl();
@@ -85,17 +84,14 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
         assert client.getCameraEntity() != null;
 
         // Raycast to where the player is currently looking
-        BlockHitResult rayCastResult = (BlockHitResult) player.raycastHitResult(0, client.getCameraEntity());
+        HitResult rayCastResult = player.raycastHitResult(0, client.getCameraEntity());
 
-        if (rayCastResult.getBlockPos().getCenter().distanceTo(player.getEyePosition()) - 0.5 <= MAX_RAY_DIST) {
-            return new Vec3(
-                    rayCastResult.getBlockPos().getX(),
-                    rayCastResult.getBlockPos().getY(),
-                    rayCastResult.getBlockPos().getZ()
-            );
+        if (rayCastResult.getType().equals(HitResult.Type.BLOCK)) {
+            BlockHitResult blockHitResult = (BlockHitResult) rayCastResult;
+            return new Vec3(blockHitResult.getBlockPos());
         }
 
-        return null;
+        return rayCastResult.getLocation();
     }
 
     private void extractLine(LevelExtractionContext context, Vec3 firstPos, Vec3 secondPos, boolean isClick) {

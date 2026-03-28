@@ -37,6 +37,6 @@ public class Random {
     }
 
     public static Vec3i toIntVec(Vec3 vec) {
-        return new Vec3i((int) vec.x, (int) vec.y, (int) vec.z);
+        return new Vec3i((int) Math.floor(vec.x), (int) Math.floor(vec.y), (int) Math.floor(vec.z));
     }
 }

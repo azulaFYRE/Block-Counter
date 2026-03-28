@@ -4,7 +4,6 @@ import azula.blockcounter.BlockCounterClient;
 import azula.blockcounter.config.BlockCounterModMenuConfig;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.pipeline.ColorTargetState;
 import com.mojang.blaze3d.pipeline.DepthStencilState;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.platform.CompareOp;
@@ -18,6 +17,8 @@ import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelExtractionContext;
 import net.fabricmc.loader.api.FabricLoader;
+import net.irisshaders.iris.api.v0.IrisApi;
+import net.irisshaders.iris.api.v0.IrisProgram;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MappableRingBuffer;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -32,7 +33,6 @@ import org.lwjgl.system.MemoryUtil;
 import java.awt.Color;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 
@@ -57,9 +57,15 @@ public class RenderingServiceImpl implements RenderingService {
     private static final Vector3f MODEL_OFFSET = new Vector3f();
     private static final Matrix4f TEXTURE_MATRIX = new Matrix4f();
 
+    private final boolean usingIris;
+
     private enum BufferType {
         QUAD,
         LINE
+    }
+
+    public RenderingServiceImpl() {
+        this.usingIris = FabricLoader.getInstance().isModLoaded("iris");
     }
 
     public void setRenderColors(BlockCounterModMenuConfig config) {
@@ -80,16 +86,15 @@ public class RenderingServiceImpl implements RenderingService {
         this.setRenderColors(BlockCounterClient.getInstance().getConfig());
 
         if (LINE_PIPELINE == null) {
-            if (FabricLoader.getInstance().isModLoaded("iris")) {
-                LINE_PIPELINE = RenderPipelines.LINES;
-            } else {
-                LINE_PIPELINE = RenderPipelines.register(
-                        RenderPipeline.builder(RenderPipelines.LINES_SNIPPET)
-                                .withLocation(Identifier.fromNamespaceAndPath(BlockCounterClient.MOD_ID, "pipeline/line"))
-                                .withColorTargetState(new ColorTargetState(Optional.empty(), ColorTargetState.WRITE_ALL))
-                                .withDepthStencilState(new DepthStencilState(CompareOp.ALWAYS_PASS, false))
-                                .build()
-                );
+            LINE_PIPELINE = RenderPipelines.register(
+                    RenderPipeline.builder(RenderPipelines.LINES_SNIPPET)
+                            .withLocation(Identifier.fromNamespaceAndPath(BlockCounterClient.MOD_ID, "pipeline/line"))
+                            .withDepthStencilState(new DepthStencilState(CompareOp.ALWAYS_PASS, false))
+                            .build()
+            );
+
+            if (this.usingIris) {
+                IrisApi.getInstance().assignPipeline(LINE_PIPELINE, IrisProgram.LINES);
             }
         }
 
@@ -110,19 +115,17 @@ public class RenderingServiceImpl implements RenderingService {
         this.setRenderColors(BlockCounterClient.getInstance().getConfig());
 
         if (QUAD_PIPELINE == null) {
-            if (FabricLoader.getInstance().isModLoaded("iris")) {
-                QUAD_PIPELINE = RenderPipelines.DEBUG_QUADS;
-            } else {
-                QUAD_PIPELINE = RenderPipelines.register(
-                        RenderPipeline.builder(RenderPipelines.DEBUG_FILLED_SNIPPET)
-                                .withLocation(Identifier.fromNamespaceAndPath(BlockCounterClient.MOD_ID, "pipeline/quad"))
-                                .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS)
-                                .withColorTargetState(new ColorTargetState(Optional.empty(), ColorTargetState.WRITE_ALL))
-                                .withDepthStencilState(new DepthStencilState(CompareOp.ALWAYS_PASS, false))
-                                .build()
-                );
-            }
+            QUAD_PIPELINE = RenderPipelines.register(
+                    RenderPipeline.builder(RenderPipelines.DEBUG_FILLED_SNIPPET)
+                            .withLocation(Identifier.fromNamespaceAndPath(BlockCounterClient.MOD_ID, "pipeline/quad"))
+                            .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS)
+                            .withDepthStencilState(new DepthStencilState(CompareOp.ALWAYS_PASS, false))
+                            .build()
+            );
 
+            if (this.usingIris) {
+                IrisApi.getInstance().assignPipeline(QUAD_PIPELINE, IrisProgram.BASIC);
+            }
         }
 
         if (this.quadBuffer == null) {
