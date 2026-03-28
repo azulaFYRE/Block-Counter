@@ -30,26 +30,21 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
 
     @Override
     public void extractStandingSelection(LevelExtractionContext context, Vec3 firstPos, BlockPos lockPos) {
+        Minecraft client = Minecraft.getInstance();
+        assert client.player != null;
 
-        if (firstPos != null) {
-            Minecraft client = Minecraft.getInstance();
-            assert client.player != null;
+        BlockPos blockPosFirst = new BlockPos(Random.toIntVec(firstPos));
+        BlockPos playerPos = client.player.getOnPos();
+        Vec3 toRender = new Vec3(playerPos);
 
-            Vec3 playerPos = client.player.getOnPos().getBottomCenter();
-
-            BlockPos blockPosFirst = new BlockPos(Random.toIntVec(firstPos));
-            BlockPos blockPosPlayer = new BlockPos(Random.toIntVec(playerPos));
-            Vec3 toRender = new Vec3(blockPosPlayer);
-
-            if (lockPos != null) {
-                blockPosPlayer = lockPos;
-                toRender = new Vec3(blockPosPlayer);
-            }
-
-            Vec3 fixedFirst = new Vec3(blockPosFirst);
-
-            this.extractLine(context, fixedFirst, toRender, false);
+        if (lockPos != null) {
+            playerPos = lockPos;
+            toRender = new Vec3(playerPos);
         }
+
+        Vec3 fixedFirst = new Vec3(blockPosFirst);
+
+        this.extractLine(context, fixedFirst, toRender, false);
     }
 
     @Override
@@ -129,13 +124,10 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
         Vec3i firstPosInt = Random.toIntVec(firstPos).offset(offset);
         Vec3i secondPosInt = Random.toIntVec(secondPos).offset(offset);
 
-        Vec3 alteredSecond = new Vec3(secondPosInt.getX(), secondPosInt.getY() - (isClick ? 0 : 1), secondPosInt.getZ());
-        Vec3 renderPos = new Vec3(firstPosInt.getX(), firstPosInt.getY() - (isClick ? 0 : 1), firstPosInt.getZ());
+        Vec3 alteredSecond = new Vec3(secondPosInt.getX(), secondPosInt.getY(), secondPosInt.getZ());
+        Vec3 renderPos = new Vec3(firstPosInt.getX(), firstPosInt.getY(), firstPosInt.getZ());
 
         Vec3 dimensions = this.findDimensions(renderPos, alteredSecond);
-
-        int clickOffset = isClick ? 1 : 0;
-        int standOffset = isClick ? 0 : 1;
 
         // Rendering library seems to have trouble with negative dimensions, so instead we will make the dimension
         // positive while translating the initial render position in order to render using positive dimensions
@@ -148,9 +140,9 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
             renderPos = new Vec3(newFirstX, renderPos.y, renderPos.z);
         } else if (dimensions.y < 0) {
             double absY = Math.abs(dimensions.y);
-            int newFirstY = (int) (firstPosInt.getY() - (absY + standOffset));
+            int newFirstY = (int) (firstPosInt.getY() - absY);
 
-            dimensions = new Vec3(dimensions.x, absY + clickOffset + standOffset, dimensions.z);
+            dimensions = new Vec3(dimensions.x, absY + 1, dimensions.z);
             renderPos = new Vec3(renderPos.x, newFirstY, renderPos.z);
         } else if (dimensions.z < 0) {
             double absZ = Math.abs(dimensions.z);
@@ -158,11 +150,6 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
 
             dimensions = new Vec3(dimensions.x, dimensions.y, absZ + 1);
             renderPos = new Vec3(renderPos.x, renderPos.y, newFirstZ);
-        }
-
-        if (dimensions.y > 1 && !isClick) {
-            dimensions = new Vec3(dimensions.x, dimensions.y - 1, dimensions.z);
-            renderPos = new Vec3(renderPos.x, renderPos.y + 1, renderPos.z);
         }
 
         Direction.Axis dir = BlockCalculations.findLargestAxisDiff(dimensions);
@@ -235,8 +222,8 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
         Vec3i firstPosInt = Random.toIntVec(firstPos).offset(offset);
         Vec3i secondPosInt = Random.toIntVec(secondPos).offset(offset);
 
-        Vec3 startPos = new Vec3(firstPosInt.getX(), firstPosInt.getY() - (isClick ? 0 : 1), firstPosInt.getZ());
-        Vec3 endPos = new Vec3(secondPosInt.getX(), secondPosInt.getY() - (isClick ? 0 : 1), secondPosInt.getZ());
+        Vec3 startPos = new Vec3(firstPosInt.getX(), firstPosInt.getY(), firstPosInt.getZ());
+        Vec3 endPos = new Vec3(secondPosInt.getX(), secondPosInt.getY(), secondPosInt.getZ());
 
         int x = (int) startPos.x;
         int y = (int) startPos.y;

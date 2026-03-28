@@ -29,8 +29,7 @@ public class BlockCalculations {
             newSecond = secondPos.projectedOn(z);
         }
 
-        return (int) Math.ceil(newFirst.distanceTo(newSecond))
-                + (!isClick && largestDiff.equals(Direction.Axis.Y) ? 0 : 1);
+        return (int) Math.ceil(newFirst.distanceTo(newSecond)) + 1;
     }
 
     public static int calculateBlocksTwo(Vec3 firstPos, Vec3 secondPos, boolean isClick) {

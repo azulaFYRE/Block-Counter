@@ -54,6 +54,7 @@ public class BlockCounterClient implements ClientModInitializer {
     private Vec3 secondPosition;
 
     private boolean didRightClick = false;
+    private boolean activateKeyDown = false;
 
     @Override
     public void onInitializeClient() {
@@ -66,7 +67,7 @@ public class BlockCounterClient implements ClientModInitializer {
         this.config = configHolder.getConfig();
 
         // Key binding
-        KeyMapping.Category blockCounterCategory = new KeyMapping.Category(Objects.requireNonNull(Identifier.tryBuild("blockcounter", "category/block-counter")));
+        KeyMapping.Category blockCounterCategory = new KeyMapping.Category(Identifier.fromNamespaceAndPath("blockcounter", "category"));
 
         // Grab activation keyBinding
         activationKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
@@ -94,7 +95,7 @@ public class BlockCounterClient implements ClientModInitializer {
                 client.setScreen(new LineConfigScreen(this.lineConfigService, client.screen));
             }
 
-            if (activationKey.isDown()) {
+            if (activationKey.isDown() && !this.activateKeyDown) {
                 if (config.activationMethod.equals(ActivationMethod.STANDING)) {
                     handleStanding(client.player);
                 } else {
@@ -102,12 +103,14 @@ public class BlockCounterClient implements ClientModInitializer {
                 }
             }
 
+            this.activateKeyDown = activationKey.isDown();
+
             if (client.player != null) {
                 boolean didClick = client.mouseHandler.isRightPressed();
 
-                if (didClick && didClick != this.didRightClick && config.activationMethod.equals(ActivationMethod.CLICK)) {
+                if (didClick && !this.didRightClick && config.activationMethod.equals(ActivationMethod.CLICK)) {
                     LocalPlayer player = client.player;
-                    BlockHitResult hitResult = (BlockHitResult) player.raycastHitResult(5, client.getCameraEntity());
+                    BlockHitResult hitResult = (BlockHitResult) player.raycastHitResult(0, Objects.requireNonNull(client.getCameraEntity()));
                     handleClick(client.player, hitResult.getBlockPos());
                 }
 
@@ -141,27 +144,27 @@ public class BlockCounterClient implements ClientModInitializer {
 
         // Extraction phase here
         LevelRenderEvents.END_EXTRACTION.register(context -> {
-            if (firstPosition != null) {
 
-                BlockPos lockPos = null;
+            if (firstPosition == null) return;
 
-                if (this.lineConfigService.canPlaceLine()) {
-                    if (secondPosition != null) {
-                        lockPos = new BlockPos(Random.toIntVec(secondPosition));
-                    }
+            BlockPos lockPos = null;
+
+            if (this.lineConfigService.canPlaceLine()) {
+                if (secondPosition != null) {
+                    lockPos = new BlockPos(Random.toIntVec(secondPosition));
                 }
+            }
 
-                if (config.activationMethod.equals(ActivationMethod.STANDING)) {
-                    blockRenderingService.extractStandingSelection(
-                            context,
-                            firstPosition,
-                            lockPos);
-                } else {
-                    blockRenderingService.extractClickSelection(
-                            context,
-                            firstPosition,
-                            lockPos);
-                }
+            if (config.activationMethod.equals(ActivationMethod.STANDING)) {
+                blockRenderingService.extractStandingSelection(
+                        context,
+                        firstPosition,
+                        lockPos);
+            } else {
+                blockRenderingService.extractClickSelection(
+                        context,
+                        firstPosition,
+                        lockPos);
             }
         });
 
