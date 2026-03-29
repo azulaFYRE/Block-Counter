@@ -25,6 +25,7 @@ import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
@@ -110,8 +111,18 @@ public class BlockCounterClient implements ClientModInitializer {
 
                 if (didClick && !this.didRightClick && config.activationMethod.equals(ActivationMethod.CLICK)) {
                     LocalPlayer player = client.player;
-                    BlockHitResult hitResult = (BlockHitResult) player.raycastHitResult(0, Objects.requireNonNull(client.getCameraEntity()));
-                    handleClick(client.player, hitResult.getBlockPos());
+                    HitResult hitResult = player.raycastHitResult(0, Objects.requireNonNull(client.getCameraEntity()));
+
+                    Vec3 hitPos;
+
+                    if (hitResult.getType().equals(HitResult.Type.BLOCK)) {
+                        BlockHitResult blockHitResult = (BlockHitResult) hitResult;
+                        hitPos = new Vec3(blockHitResult.getBlockPos());
+                    } else {
+                        hitPos = new Vec3(Random.toIntVec(hitResult.getLocation()));
+                    }
+
+                    handleClick(client.player, hitPos);
                 }
 
                 this.didRightClick = didClick;
@@ -259,10 +270,10 @@ public class BlockCounterClient implements ClientModInitializer {
         }
     }
 
-    private void handleClick(LocalPlayer player, BlockPos pos) {
+    private void handleClick(LocalPlayer player, Vec3 pos) {
 
         if (clickStep.get().equals(ActivationStep.STARTED)) {
-            firstPosition = new Vec3(pos);
+            firstPosition = pos;
             secondPosition = null;
 
             printFirst(player);
@@ -279,7 +290,7 @@ public class BlockCounterClient implements ClientModInitializer {
 
         } else if (clickStep.get().equals(ActivationStep.DURING)) {
             if (!this.lineConfigService.canPlaceLine()) {
-                secondPosition = new Vec3(pos);
+                secondPosition = pos;
 
                 printSecond(player);
 
@@ -289,7 +300,7 @@ public class BlockCounterClient implements ClientModInitializer {
                 clickStep.set(ActivationStep.FINISHED);
             } else {
                 if (secondPosition == null) {
-                    secondPosition = new Vec3(pos);
+                    secondPosition = pos;
                     printSecond(player);
                 }
             }
