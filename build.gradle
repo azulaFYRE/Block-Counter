@@ -60,10 +60,8 @@ dependencies {
 	}
 
 	// Iris
-//	clientRuntimeOnly(files("libs/iris-fabric-1.10.8+mc26.1.jar"))
-//	clientRuntimeOnly(files("libs/sodium-fabric-0.8.7+mc26.1.jar"))
-	implementation "maven.modrinth:iris:${iris_version}"
-	implementation "maven.modrinth:sodium:${sodium_version}"
+//	implementation "maven.modrinth:iris:${iris_version}"
+//	implementation "maven.modrinth:sodium:${sodium_version}"
 
 }
 

@@ -124,7 +124,7 @@ public class LineConfigScreen extends Screen {
         KeyMapping configKey = BlockCounterClient.configMenuKey;
 
         if (configKey.matches(keyCode) || keyCode.isEscape()) {
-            minecraft.setScreen(this.parent);
+            minecraft.setScreenAndShow(this.parent);
         }
 
         return true;

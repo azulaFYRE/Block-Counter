@@ -17,8 +17,8 @@ import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelExtractionContext;
 import net.fabricmc.loader.api.FabricLoader;
-import net.irisshaders.iris.api.v0.IrisApi;
-import net.irisshaders.iris.api.v0.IrisProgram;
+//import net.irisshaders.iris.api.v0.IrisApi;
+//import net.irisshaders.iris.api.v0.IrisProgram;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MappableRingBuffer;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -31,6 +31,7 @@ import org.joml.Vector4f;
 import org.lwjgl.system.MemoryUtil;
 
 import java.awt.Color;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Objects;
 import java.util.OptionalDouble;
@@ -93,9 +94,9 @@ public class RenderingServiceImpl implements RenderingService {
                             .build()
             );
 
-            if (this.usingIris) {
-                IrisApi.getInstance().assignPipeline(LINE_PIPELINE, IrisProgram.LINES);
-            }
+//            if (this.usingIris) {
+//                IrisApi.getInstance().assignPipeline(LINE_PIPELINE, IrisProgram.LINES);
+//            }
         }
 
         if (this.lineBuffer == null) {
@@ -123,9 +124,9 @@ public class RenderingServiceImpl implements RenderingService {
                             .build()
             );
 
-            if (this.usingIris) {
-                IrisApi.getInstance().assignPipeline(QUAD_PIPELINE, IrisProgram.BASIC);
-            }
+//            if (this.usingIris) {
+//                IrisApi.getInstance().assignPipeline(QUAD_PIPELINE, IrisProgram.BASIC);
+//            }
         }
 
         if (this.quadBuffer == null) {
@@ -323,8 +324,13 @@ public class RenderingServiceImpl implements RenderingService {
             // Sort the quads if there is translucency
             builtBuffer.sortQuads(allocator, RenderSystem.getProjectionType().vertexSorting());
             // Upload the index buffer
-            indices = pipeline.getVertexFormat().uploadImmediateIndexBuffer(Objects.requireNonNull(builtBuffer.indexBuffer()));
+            ByteBuffer rawIndexBuffer = Objects.requireNonNull(builtBuffer.indexBuffer());
+            indices = RenderSystem.getDevice().createBuffer(() -> "Block Counter Immediate Index Buffer",
+                    GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_COPY_DST,
+                    rawIndexBuffer.remaining());
             indexType = builtBuffer.drawState().indexType();
+
+            RenderSystem.getDevice().createCommandEncoder().writeToBuffer(indices.slice(), rawIndexBuffer);
         } else {
             // Use the general shape index buffer for non-quad draw modes
             RenderSystem.AutoStorageIndexBuffer shapeIndexBuffer = RenderSystem.getSequentialBuffer(pipeline.getVertexFormatMode());
@@ -334,13 +340,13 @@ public class RenderingServiceImpl implements RenderingService {
 
         // Actually execute the draw
         GpuBufferSlice dynamicTransforms = RenderSystem.getDynamicUniforms()
-                .writeTransform(RenderSystem.getModelViewMatrix(), COLOR_MODULATOR, MODEL_OFFSET, TEXTURE_MATRIX);
+                .writeTransform(RenderSystem.getModelViewMatrixCopy(), COLOR_MODULATOR, MODEL_OFFSET, TEXTURE_MATRIX);
         try (RenderPass renderPass = RenderSystem.getDevice()
                 .createCommandEncoder()
                 .createRenderPass(() -> BlockCounterClient.MOD_ID + (type == BufferType.LINE ? " line" : " quad") + " render pipeline drawing",
-                        Objects.requireNonNull(client.getMainRenderTarget().getColorTextureView()),
+                        Objects.requireNonNull(client.gameRenderer.mainRenderTarget().getColorTextureView()),
                         OptionalInt.empty(),
-                        client.getMainRenderTarget().getDepthTextureView(),
+                        client.gameRenderer.mainRenderTarget().getDepthTextureView(),
                         OptionalDouble.empty())) {
             renderPass.setPipeline(pipeline);
 

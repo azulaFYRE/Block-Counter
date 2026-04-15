@@ -15,6 +15,8 @@ import me.shedaniel.autoconfig.serializer.Toml4jConfigSerializer;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelExtractionContext;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelExtractionEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.minecraft.client.KeyMapping;
@@ -93,7 +95,7 @@ public class BlockCounterClient implements ClientModInitializer {
 
             // Check for menu key
             if (configMenuKey.isDown()) {
-                client.setScreen(new LineConfigScreen(this.lineConfigService, client.screen));
+                client.setScreenAndShow(new LineConfigScreen(this.lineConfigService, client.gui.screen()));
             }
 
             if (activationKey.isDown() && !this.activateKeyDown) {
@@ -154,7 +156,7 @@ public class BlockCounterClient implements ClientModInitializer {
         });
 
         // Extraction phase here
-        LevelRenderEvents.END_EXTRACTION.register(context -> {
+        LevelExtractionEvents.END_EXTRACTION.register(context -> {
 
             if (firstPosition == null) return;
 
