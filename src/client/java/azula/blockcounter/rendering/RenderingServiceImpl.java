@@ -2,6 +2,7 @@ package azula.blockcounter.rendering;
 
 import azula.blockcounter.BlockCounterClient;
 import azula.blockcounter.config.BlockCounterModMenuConfig;
+import com.mojang.blaze3d.IndexType;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.pipeline.DepthStencilState;
@@ -28,14 +29,13 @@ import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
-import org.lwjgl.system.MemoryUtil;
 
 import java.awt.Color;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.OptionalDouble;
-import java.util.OptionalInt;
 
 public class RenderingServiceImpl implements RenderingService {
 
@@ -57,6 +57,8 @@ public class RenderingServiceImpl implements RenderingService {
     private static final Vector4f COLOR_MODULATOR = new Vector4f(1f, 1f, 1f, 1f);
     private static final Vector3f MODEL_OFFSET = new Vector3f();
     private static final Matrix4f TEXTURE_MATRIX = new Matrix4f();
+
+    private static final int BINDING_INDEX = 0;
 
     private final boolean usingIris;
 
@@ -90,6 +92,7 @@ public class RenderingServiceImpl implements RenderingService {
             LINE_PIPELINE = RenderPipelines.register(
                     RenderPipeline.builder(RenderPipelines.LINES_SNIPPET)
                             .withLocation(Identifier.fromNamespaceAndPath(BlockCounterClient.MOD_ID, "pipeline/line"))
+                            .withVertexBinding(BINDING_INDEX, DefaultVertexFormat.POSITION_COLOR_NORMAL_LINE_WIDTH)
                             .withDepthStencilState(new DepthStencilState(CompareOp.ALWAYS_PASS, false))
                             .build()
             );
@@ -100,7 +103,7 @@ public class RenderingServiceImpl implements RenderingService {
         }
 
         if (this.lineBuffer == null) {
-            this.lineBuffer = new BufferBuilder(lineAllocator, LINE_PIPELINE.getVertexFormatMode(), LINE_PIPELINE.getVertexFormat());
+            this.lineBuffer = new BufferBuilder(lineAllocator, LINE_PIPELINE.getPrimitiveTopology(), Objects.requireNonNull(LINE_PIPELINE.getVertexFormatBinding(BINDING_INDEX)));
         }
 
         Vec3 camPos = context.camera().position();
@@ -119,7 +122,7 @@ public class RenderingServiceImpl implements RenderingService {
             QUAD_PIPELINE = RenderPipelines.register(
                     RenderPipeline.builder(RenderPipelines.DEBUG_FILLED_SNIPPET)
                             .withLocation(Identifier.fromNamespaceAndPath(BlockCounterClient.MOD_ID, "pipeline/quad"))
-                            .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS)
+                            .withVertexBinding(BINDING_INDEX, DefaultVertexFormat.POSITION_COLOR)
                             .withDepthStencilState(new DepthStencilState(CompareOp.ALWAYS_PASS, false))
                             .build()
             );
@@ -130,7 +133,7 @@ public class RenderingServiceImpl implements RenderingService {
         }
 
         if (this.quadBuffer == null) {
-            this.quadBuffer = new BufferBuilder(quadAllocator, QUAD_PIPELINE.getVertexFormatMode(), QUAD_PIPELINE.getVertexFormat());
+            this.quadBuffer = new BufferBuilder(quadAllocator, QUAD_PIPELINE.getPrimitiveTopology(), Objects.requireNonNull(QUAD_PIPELINE.getVertexFormatBinding(BINDING_INDEX)));
         }
 
         Vec3 camPos = context.camera().position();
@@ -291,7 +294,7 @@ public class RenderingServiceImpl implements RenderingService {
                     this.lineVertexBuffer.close();
                 }
 
-                this.lineVertexBuffer = new MappableRingBuffer(() -> BlockCounterClient.MOD_ID + " line render pipeline", GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_MAP_WRITE, vertexBufferSize);
+                this.lineVertexBuffer = new MappableRingBuffer(() -> BlockCounterClient.MOD_ID + " line render pipeline", GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_MAP_WRITE | GpuBuffer.USAGE_COPY_DST, vertexBufferSize);
             }
         } else {
             if (this.quadVertexBuffer == null || this.quadVertexBuffer.size() < vertexBufferSize) {
@@ -299,7 +302,7 @@ public class RenderingServiceImpl implements RenderingService {
                     this.quadVertexBuffer.close();
                 }
 
-                this.quadVertexBuffer = new MappableRingBuffer(() -> BlockCounterClient.MOD_ID + " quad render pipeline", GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_MAP_WRITE, vertexBufferSize);
+                this.quadVertexBuffer = new MappableRingBuffer(() -> BlockCounterClient.MOD_ID + " quad render pipeline", GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_MAP_WRITE | GpuBuffer.USAGE_COPY_DST, vertexBufferSize);
             }
         }
 
@@ -307,20 +310,18 @@ public class RenderingServiceImpl implements RenderingService {
 
         CommandEncoder commandEncoder = RenderSystem.getDevice().createCommandEncoder();
 
-        try (GpuBuffer.MappedView mappedView = commandEncoder.mapBuffer(vertexBuffer.currentBuffer().slice(0, builtBuffer.vertexBuffer().remaining()), false, true)) {
-            MemoryUtil.memCopy(builtBuffer.vertexBuffer(), mappedView.data());
-        }
+        commandEncoder.writeToBuffer(vertexBuffer.currentBuffer().slice(), builtBuffer.vertexBuffer());
 
         return vertexBuffer.currentBuffer();
     }
 
     private static void draw(Minecraft client, RenderPipeline pipeline, MeshData builtBuffer, MeshData.DrawState drawParameters, GpuBuffer vertices, VertexFormat format, BufferType type) {
         GpuBuffer indices;
-        VertexFormat.IndexType indexType;
+        IndexType indexType;
 
         ByteBufferBuilder allocator = type == BufferType.LINE ? lineAllocator : quadAllocator;
 
-        if (pipeline.getVertexFormatMode() == VertexFormat.Mode.QUADS) {
+        if (type == BufferType.QUAD) {
             // Sort the quads if there is translucency
             builtBuffer.sortQuads(allocator, RenderSystem.getProjectionType().vertexSorting());
             // Upload the index buffer
@@ -333,7 +334,7 @@ public class RenderingServiceImpl implements RenderingService {
             RenderSystem.getDevice().createCommandEncoder().writeToBuffer(indices.slice(), rawIndexBuffer);
         } else {
             // Use the general shape index buffer for non-quad draw modes
-            RenderSystem.AutoStorageIndexBuffer shapeIndexBuffer = RenderSystem.getSequentialBuffer(pipeline.getVertexFormatMode());
+            RenderSystem.AutoStorageIndexBuffer shapeIndexBuffer = RenderSystem.getSequentialBuffer(pipeline.getPrimitiveTopology());
             indices = shapeIndexBuffer.getBuffer(drawParameters.indexCount());
             indexType = shapeIndexBuffer.type();
         }
@@ -345,7 +346,7 @@ public class RenderingServiceImpl implements RenderingService {
                 .createCommandEncoder()
                 .createRenderPass(() -> BlockCounterClient.MOD_ID + (type == BufferType.LINE ? " line" : " quad") + " render pipeline drawing",
                         Objects.requireNonNull(client.gameRenderer.mainRenderTarget().getColorTextureView()),
-                        OptionalInt.empty(),
+                        Optional.empty(),
                         client.gameRenderer.mainRenderTarget().getDepthTextureView(),
                         OptionalDouble.empty())) {
             renderPass.setPipeline(pipeline);
@@ -357,7 +358,7 @@ public class RenderingServiceImpl implements RenderingService {
             // Sampler0 is used for texture inputs in vertices
             // renderPass.bindTexture("Sampler0", textureSetup.texure0(), textureSetup.sampler0());
 
-            renderPass.setVertexBuffer(0, vertices);
+            renderPass.setVertexBuffer(0, vertices.slice());
             renderPass.setIndexBuffer(indices, indexType);
 
             // The base vertex is the starting index when we copied the data into the vertex buffer divided by vertex size
