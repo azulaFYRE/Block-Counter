@@ -9,10 +9,10 @@ import java.util.function.Consumer;
 
 public class IntSliderWidget extends AbstractSliderButton {
 
-    private int minValue;
-    private int maxValue;
+    private final int minValue;
+    private final int maxValue;
     private int scaledValue;
-    private String label;
+    private final String label;
 
     private final List<Consumer<Integer>> valueListeners = new ArrayList<>();
 

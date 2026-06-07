@@ -363,7 +363,8 @@ public class RenderingServiceImpl implements RenderingService {
 
             // The base vertex is the starting index when we copied the data into the vertex buffer divided by vertex size
             //noinspection ConstantValue
-            renderPass.drawIndexed(0 / format.getVertexSize(), 0, drawParameters.indexCount(), 1);
+//            renderPass.drawIndexed(0 / format.getVertexSize(), 0, drawParameters.indexCount(), 1);
+            renderPass.drawIndexed(drawParameters.indexCount(), drawParameters.vertexCount(), 0, 1, 0);
         }
 
         builtBuffer.close();
