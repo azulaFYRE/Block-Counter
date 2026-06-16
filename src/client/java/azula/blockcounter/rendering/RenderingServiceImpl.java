@@ -18,8 +18,8 @@ import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelExtractionContext;
 import net.fabricmc.loader.api.FabricLoader;
-//import net.irisshaders.iris.api.v0.IrisApi;
-//import net.irisshaders.iris.api.v0.IrisProgram;
+import net.irisshaders.iris.api.v0.IrisApi;
+import net.irisshaders.iris.api.v0.IrisProgram;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MappableRingBuffer;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -97,9 +97,9 @@ public class RenderingServiceImpl implements RenderingService {
                             .build()
             );
 
-//            if (this.usingIris) {
-//                IrisApi.getInstance().assignPipeline(LINE_PIPELINE, IrisProgram.LINES);
-//            }
+            if (this.usingIris) {
+                IrisApi.getInstance().assignPipeline(LINE_PIPELINE, IrisProgram.LINES);
+            }
         }
 
         if (this.lineBuffer == null) {
@@ -127,9 +127,9 @@ public class RenderingServiceImpl implements RenderingService {
                             .build()
             );
 
-//            if (this.usingIris) {
-//                IrisApi.getInstance().assignPipeline(QUAD_PIPELINE, IrisProgram.BASIC);
-//            }
+            if (this.usingIris) {
+                IrisApi.getInstance().assignPipeline(QUAD_PIPELINE, IrisProgram.BASIC);
+            }
         }
 
         if (this.quadBuffer == null) {
