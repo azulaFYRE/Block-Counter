@@ -3,8 +3,6 @@
   "text.autoconfig.blockcounter.category.General": "General",
   "text.autoconfig.blockcounter.category.Customization": "Customization",
   "text.autoconfig.blockcounter.option.activationMethod": "Activation Method",
-  "text.autoconfig.blockcounter.option.activationKey": "Activation Key",
-  "text.autoconfig.blockcounter.option.configMenuKey": "Open Config Menu",
   "text.autoconfig.blockcounter.option.msgDisplayLocation": "Message Location",
   "text.autoconfig.blockcounter.option.showPosMessages": "Position Messages",
   "text.autoconfig.blockcounter.option.simplifiedMessages": "Simplified Messages",
@@ -36,5 +34,7 @@
   "text.autoconfig.blockcounter.renderType.solid": "Solid",
   "text.autoconfig.blockcounter.renderType.edgesOnly": "Edges Only",
   "text.autoconfig.blockcounter.renderType.solidEdges": "Solid with Edges",
-  "text.category.blockcounter": "Block Counter"
+  "text.blockcounter.option.activationKey": "Activation Key",
+  "text.blockcounter.option.configMenuKey": "Open Config Menu",
+  "key.category.blockcounter.category": "Block Counter"
 }
