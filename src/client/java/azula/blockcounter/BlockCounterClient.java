@@ -65,18 +65,18 @@ public class BlockCounterClient implements ClientModInitializer {
         this.config = configHolder.getConfig();
 
         // Key binding
-        KeyBinding.Category blockCounterCategory = new KeyBinding.Category(Identifier.of("blockcounter"));
+        KeyBinding.Category blockCounterCategory = KeyBinding.Category.create(Identifier.of("blockcounter", "category"));
 
         // Grab activation keyBinding
         activationKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-                "text.autoconfig.blockcounter.option.activationKey",
+                "text.blockcounter.option.activationKey",
                 GLFW.GLFW_KEY_COMMA,
                 blockCounterCategory
         ));
 
         // Grab config menu keyBinding
         configMenuKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-                "text.autoconfig.blockcounter.option.configMenuKey",
+                "text.blockcounter.option.configMenuKey",
                 GLFW.GLFW_KEY_DELETE,
                 blockCounterCategory
         ));
