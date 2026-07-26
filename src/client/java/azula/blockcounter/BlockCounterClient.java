@@ -21,6 +21,7 @@ import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Vec3i;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.Identifier;
@@ -28,7 +29,6 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
-import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,6 +58,10 @@ public class BlockCounterClient implements ClientModInitializer {
     private boolean didRightClick = false;
     private boolean activateKeyDown = false;
 
+    // These are coming from the KeyMapping class
+    private final String COMMA_KEYCODE = "key.keyboard.comma";
+    private final String DELETE_KEYCODE = "key.keyboard.delete";
+
     @Override
     public void onInitializeClient() {
         ConfigHolder<BlockCounterModMenuConfig> configHolder = AutoConfig
@@ -71,19 +75,29 @@ public class BlockCounterClient implements ClientModInitializer {
         // Key binding
         KeyMapping.Category blockCounterCategory = new KeyMapping.Category(Identifier.fromNamespaceAndPath("blockcounter", "category"));
 
-        // Grab activation keyBinding
-        activationKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
-                "text.autoconfig.blockcounter.option.activationKey",
-                GLFW.GLFW_KEY_COMMA,
-                blockCounterCategory
-        ));
+        try {
+            // Grab activation keyBinding
+            activationKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+                    "text.autoconfig.blockcounter.option.activationKey",
+                    Objects.requireNonNull(KeyMapping.get(COMMA_KEYCODE)).getDefaultKey().getValue(),
+                    blockCounterCategory
+            ));
+        } catch (NullPointerException e) {
+            throw new RuntimeException("Block-Counter: Failed to register default activation key binding");
+        }
 
-        // Grab config menu keyBinding
-        configMenuKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
-                "text.autoconfig.blockcounter.option.configMenuKey",
-                GLFW.GLFW_KEY_DELETE,
-                blockCounterCategory
-        ));
+
+        try {
+            // Grab config menu keyBinding
+            configMenuKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+                    "text.autoconfig.blockcounter.option.configMenuKey",
+                    Objects.requireNonNull(KeyMapping.get(DELETE_KEYCODE)).getDefaultKey().getValue(),
+                    blockCounterCategory
+            ));
+        } catch (NullPointerException e) {
+            throw new RuntimeException("Block-Counter: Failed to register default config menu key binding");
+        }
+
 
         // Handle activation key press
         standStep.set(ActivationStep.FINISHED);
@@ -163,7 +177,8 @@ public class BlockCounterClient implements ClientModInitializer {
 
             if (this.lineConfigService.canPlaceLine()) {
                 if (secondPosition != null) {
-                    lockPos = new BlockPos(Random.toIntVec(secondPosition));
+                    Vec3i secondPos = Random.toIntVec(secondPosition);
+                    lockPos = new BlockPos(secondPos.getX(), secondPos.getY(), secondPos.getZ());
                 }
             }
 
@@ -319,7 +334,7 @@ public class BlockCounterClient implements ClientModInitializer {
             String firstPosShort = "1: %s";
 
             MutableComponent chatMsg = Component.literal(
-                    simplify ? String.format(firstPosShort, first) : String.format(firstPosLong, first))
+                            simplify ? String.format(firstPosShort, first) : String.format(firstPosLong, first))
                     .withStyle(Random.chatColorToFormat(config.chatColor));
 
             if (config.msgDisplayLocation.equals(MessageDisplay.CHAT)) {
@@ -341,7 +356,7 @@ public class BlockCounterClient implements ClientModInitializer {
             String secondPosShort = "2: %s";
 
             MutableComponent chatMsg = Component.literal(
-                    simplify ? String.format(secondPosShort, second) : String.format(secondPosLong, second))
+                            simplify ? String.format(secondPosShort, second) : String.format(secondPosLong, second))
                     .withStyle(Random.chatColorToFormat(config.chatColor));
 
             if (config.msgDisplayLocation.equals(MessageDisplay.CHAT)) {

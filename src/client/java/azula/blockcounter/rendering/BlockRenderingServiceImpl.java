@@ -32,7 +32,8 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
         Minecraft client = Minecraft.getInstance();
         assert client.player != null;
 
-        BlockPos blockPosFirst = new BlockPos(Random.toIntVec(firstPos));
+        Vec3i firstP = Random.toIntVec(firstPos);
+        BlockPos blockPosFirst = new BlockPos(firstP.getX(), firstP.getY(), firstP.getZ());
         BlockPos playerPos = client.player.getOnPos();
         Vec3 toRender = new Vec3(playerPos);
 

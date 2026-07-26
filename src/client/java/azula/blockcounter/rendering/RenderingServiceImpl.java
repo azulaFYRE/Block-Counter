@@ -2,24 +2,25 @@ package azula.blockcounter.rendering;
 
 import azula.blockcounter.BlockCounterClient;
 import azula.blockcounter.config.BlockCounterModMenuConfig;
-import com.mojang.blaze3d.IndexType;
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.pipeline.DepthStencilState;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.platform.CompareOp;
-import com.mojang.blaze3d.systems.CommandEncoder;
-import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.ByteBufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.MeshData;
-import com.mojang.blaze3d.vertex.VertexFormat;
+import com.mojang.renderpearl.api.buffers.GpuBuffer;
+import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
+import com.mojang.renderpearl.api.commands.CommandEncoder;
+import com.mojang.renderpearl.api.commands.RenderPass;
+import com.mojang.renderpearl.api.pipeline.CompareOp;
+import com.mojang.renderpearl.api.pipeline.CompiledRenderPipeline;
+import com.mojang.renderpearl.api.pipeline.DepthStencilState;
+import com.mojang.renderpearl.api.pipeline.IndexType;
+import com.mojang.renderpearl.api.pipeline.RenderPipeline;
+import com.mojang.renderpearl.api.vertex.VertexFormat;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelExtractionContext;
 import net.fabricmc.loader.api.FabricLoader;
-import net.irisshaders.iris.api.v0.IrisApi;
-import net.irisshaders.iris.api.v0.IrisProgram;
+//import net.irisshaders.iris.api.v0.IrisApi;
+//import net.irisshaders.iris.api.v0.IrisProgram;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MappableRingBuffer;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -97,9 +98,9 @@ public class RenderingServiceImpl implements RenderingService {
                             .build()
             );
 
-            if (this.usingIris) {
-                IrisApi.getInstance().assignPipeline(LINE_PIPELINE, IrisProgram.LINES);
-            }
+//            if (this.usingIris) {
+//                IrisApi.getInstance().assignPipeline(LINE_PIPELINE, IrisProgram.LINES);
+//            }
         }
 
         if (this.lineBuffer == null) {
@@ -127,9 +128,9 @@ public class RenderingServiceImpl implements RenderingService {
                             .build()
             );
 
-            if (this.usingIris) {
-                IrisApi.getInstance().assignPipeline(QUAD_PIPELINE, IrisProgram.BASIC);
-            }
+//            if (this.usingIris) {
+//                IrisApi.getInstance().assignPipeline(QUAD_PIPELINE, IrisProgram.BASIC);
+//            }
         }
 
         if (this.quadBuffer == null) {
