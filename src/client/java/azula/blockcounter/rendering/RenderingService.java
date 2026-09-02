@@ -1,18 +1,12 @@
 package azula.blockcounter.rendering;
 
 import azula.blockcounter.config.BlockCounterModMenuConfig;
-import net.fabricmc.fabric.api.client.rendering.v1.level.LevelExtractionContext;
-import net.minecraft.world.phys.Vec3;
-
-import java.util.List;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;
 
 public interface RenderingService {
 
     void setRenderColors(BlockCounterModMenuConfig config);
 
-    void fillLineBuffer(LevelExtractionContext context, List<Vec3> pos);
-    void fillQuadBuffer(LevelExtractionContext context, List<Vec3> pos);
-
-    void renderLineBuffer();
-    void renderQuadBuffer();
+    void renderLineBuffer(LevelRenderContext context, BlockRenderingService.BlockCounterRenderState renderState);
+    void renderQuadBuffer(LevelRenderContext context, BlockRenderingService.BlockCounterRenderState renderState);
 }

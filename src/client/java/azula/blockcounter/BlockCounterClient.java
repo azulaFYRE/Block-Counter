@@ -9,6 +9,7 @@ import azula.blockcounter.rendering.BlockRenderingService;
 import azula.blockcounter.rendering.BlockRenderingServiceImpl;
 import azula.blockcounter.util.BlockCalculations;
 import azula.blockcounter.util.Random;
+import com.mojang.blaze3d.platform.InputConstants;
 import me.shedaniel.autoconfig.AutoConfig;
 import me.shedaniel.autoconfig.ConfigHolder;
 import me.shedaniel.autoconfig.serializer.Toml4jConfigSerializer;
@@ -58,10 +59,6 @@ public class BlockCounterClient implements ClientModInitializer {
     private boolean didRightClick = false;
     private boolean activateKeyDown = false;
 
-    // These are coming from the KeyMapping class
-    private final String COMMA_KEYCODE = "key.keyboard.comma";
-    private final String DELETE_KEYCODE = "key.keyboard.delete";
-
     @Override
     public void onInitializeClient() {
         ConfigHolder<BlockCounterModMenuConfig> configHolder = AutoConfig
@@ -73,30 +70,22 @@ public class BlockCounterClient implements ClientModInitializer {
         this.config = configHolder.getConfig();
 
         // Key binding
-        KeyMapping.Category blockCounterCategory = new KeyMapping.Category(Identifier.fromNamespaceAndPath("blockcounter", "category"));
+        KeyMapping.Category blockCounterCategory = KeyMapping.Category.register(
+                Identifier.fromNamespaceAndPath("blockcounter", "category"));
 
-        try {
-            // Grab activation keyBinding
-            activationKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
-                    "text.autoconfig.blockcounter.option.activationKey",
-                    Objects.requireNonNull(KeyMapping.get(COMMA_KEYCODE)).getDefaultKey().getValue(),
-                    blockCounterCategory
-            ));
-        } catch (NullPointerException e) {
-            throw new RuntimeException("Block-Counter: Failed to register default activation key binding");
-        }
+        // Grab activation keyBinding
+        activationKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+                "text.blockcounter.option.activationKey",
+                InputConstants.KEY_COMMA,
+                blockCounterCategory
+        ));
 
-
-        try {
-            // Grab config menu keyBinding
-            configMenuKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
-                    "text.autoconfig.blockcounter.option.configMenuKey",
-                    Objects.requireNonNull(KeyMapping.get(DELETE_KEYCODE)).getDefaultKey().getValue(),
-                    blockCounterCategory
-            ));
-        } catch (NullPointerException e) {
-            throw new RuntimeException("Block-Counter: Failed to register default config menu key binding");
-        }
+        // Grab config menu keyBinding
+        configMenuKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+                "text.blockcounter.option.configMenuKey",
+                InputConstants.KEY_DELETE,
+                blockCounterCategory
+        ));
 
 
         // Handle activation key press
@@ -196,7 +185,7 @@ public class BlockCounterClient implements ClientModInitializer {
         });
 
         // Block rendering
-        LevelRenderEvents.AFTER_TRANSLUCENT_TERRAIN.register(_ -> {
+        LevelRenderEvents.END_MAIN.register(context -> {
             if (firstPosition == null) return;
 
             if (this.lineConfigService.canPlaceLine()) {
@@ -211,8 +200,7 @@ public class BlockCounterClient implements ClientModInitializer {
                 }
             }
 
-            this.blockRenderingService.renderSelection(config.renderType);
-
+            this.blockRenderingService.renderSelection(config.renderType, context);
         });
     }
 

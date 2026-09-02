@@ -6,6 +6,7 @@ import azula.blockcounter.config.shape.LineConfigService;
 import azula.blockcounter.util.BlockCalculations;
 import azula.blockcounter.util.Random;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelExtractionContext;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
@@ -22,6 +23,7 @@ import java.util.List;
 public class BlockRenderingServiceImpl implements BlockRenderingService {
 
     private final RenderingService renderingService;
+    private BlockCounterRenderState blockRenderState;
 
     public BlockRenderingServiceImpl() {
         this.renderingService = new RenderingServiceImpl();
@@ -65,13 +67,15 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
     }
 
     @Override
-    public void renderSelection(RenderType renderType) {
+    public void renderSelection(RenderType renderType, LevelRenderContext context) {
+        this.renderingService.setRenderColors(BlockCounterClient.getInstance().getConfig());
+
         switch (renderType) {
-            case SOLID -> this.renderingService.renderQuadBuffer();
-            case EDGE_ONLY -> this.renderingService.renderLineBuffer();
+            case SOLID -> this.renderingService.renderQuadBuffer(context, this.blockRenderState);
+            case EDGE_ONLY -> this.renderingService.renderLineBuffer(context, this.blockRenderState);
             case SOLID_EDGE -> {
-                this.renderingService.renderQuadBuffer();
-                this.renderingService.renderLineBuffer();
+                this.renderingService.renderQuadBuffer(context, this.blockRenderState);
+                this.renderingService.renderLineBuffer(context, this.blockRenderState);
             }
         }
     }
@@ -163,14 +167,7 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
             renderPos = renderPos.add(toAdd);
         }
 
-        switch (BlockCounterClient.getInstance().getConfig().renderType) {
-            case SOLID -> this.renderingService.fillQuadBuffer(context, renders);
-            case EDGE_ONLY -> this.renderingService.fillLineBuffer(context, renders);
-            case SOLID_EDGE -> {
-                this.renderingService.fillQuadBuffer(context, renders);
-                this.renderingService.fillLineBuffer(context, renders);
-            }
-        }
+        this.blockRenderState = new BlockCounterRenderState(renders);
     }
 
     private void extractDoubleLine(LevelExtractionContext context, Vec3 firstPos, Vec3 secondPos, boolean isClick) {
@@ -297,14 +294,7 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
             }
         }
 
-        switch (BlockCounterClient.getInstance().getConfig().renderType) {
-            case SOLID -> this.renderingService.fillQuadBuffer(context, renderPoints);
-            case EDGE_ONLY -> this.renderingService.fillLineBuffer(context, renderPoints);
-            case SOLID_EDGE -> {
-                this.renderingService.fillQuadBuffer(context, renderPoints);
-                this.renderingService.fillLineBuffer(context,renderPoints);
-            }
-        }
+        this.blockRenderState = new BlockCounterRenderState(renderPoints);
     }
 
     private Vec3 findDimensions(Vec3 firstPos, Vec3 secondPos) {
@@ -332,6 +322,5 @@ public class BlockRenderingServiceImpl implements BlockRenderingService {
 
         return new Vec3(x, y, z);
     }
-
 }
 
