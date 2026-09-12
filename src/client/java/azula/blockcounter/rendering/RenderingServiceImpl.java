@@ -9,11 +9,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.renderpearl.api.GpuFormat;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.mojang.renderpearl.api.commands.RenderPass;
-import com.mojang.renderpearl.api.pipeline.ColorTargetState;
-import com.mojang.renderpearl.api.pipeline.CompareOp;
-import com.mojang.renderpearl.api.pipeline.DepthStencilState;
-import com.mojang.renderpearl.api.pipeline.RenderPipeline;
-import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
+import com.mojang.renderpearl.api.pipeline.*;
 import com.mojang.renderpearl.api.textures.GpuTextureView;
 import com.mojang.renderpearl.api.vertex.VertexFormat;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;
@@ -44,7 +40,7 @@ public class RenderingServiceImpl implements RenderingService {
                     .withLocation(Identifier.fromNamespaceAndPath(BlockCounterClient.MOD_ID, "pipeline/quad"))
                     .withVertexBinding(BINDING_INDEX, DefaultVertexFormat.POSITION_COLOR)
                     .withDepthStencilState(new DepthStencilState(CompareOp.ALWAYS_PASS, false))
-                    .withColorTargetState(new ColorTargetState(Optional.empty(), GpuFormat.RGBA8_UNORM, ColorTargetState.WRITE_ALL))
+                    .withColorTargetState(new ColorTargetState(Optional.of(BlendFunction.TRANSLUCENT), GpuFormat.RGBA8_UNORM, ColorTargetState.WRITE_ALL))
                     .build()
     );
 
@@ -53,7 +49,7 @@ public class RenderingServiceImpl implements RenderingService {
                     .withLocation(Identifier.fromNamespaceAndPath(BlockCounterClient.MOD_ID, "pipeline/line"))
                     .withVertexBinding(BINDING_INDEX, DefaultVertexFormat.POSITION_COLOR_NORMAL_LINE_WIDTH)
                     .withDepthStencilState(new DepthStencilState(CompareOp.ALWAYS_PASS, false))
-                    .withColorTargetState(new ColorTargetState(Optional.empty(), GpuFormat.RGBA8_UNORM, ColorTargetState.WRITE_ALL))
+                    .withColorTargetState(new ColorTargetState(Optional.of(BlendFunction.TRANSLUCENT), GpuFormat.RGBA8_UNORM, ColorTargetState.WRITE_ALL))
                     .build()
     );
 
